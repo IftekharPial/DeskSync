@@ -67,14 +67,6 @@ export async function GET(request: NextRequest) {
 
     const isAdmin = (session as any)?.user?.role === 'ADMIN'
 
-    // Only admins can access webhook management
-    if (!isAdmin) {
-      return NextResponse.json(
-        { success: false, error: 'Forbidden - Admin access required' },
-        { status: 403, headers: corsHeaders }
-      )
-    }
-
     // Get pagination parameters
     const { searchParams } = new URL(request.url)
     const page = parseInt(searchParams.get('page') || '1')

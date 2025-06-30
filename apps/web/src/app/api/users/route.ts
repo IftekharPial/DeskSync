@@ -110,9 +110,7 @@ export async function GET(request: NextRequest) {
           updatedAt: true,
           _count: {
             select: {
-              dailyReports: true,
-              meetingReports: true,
-              webhooks: true,
+              createdWebhooks: true,
             }
           }
         }
@@ -121,6 +119,8 @@ export async function GET(request: NextRequest) {
     ])
 
     const totalPages = Math.ceil(total / limit)
+
+
 
     return NextResponse.json({
       success: true,

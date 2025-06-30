@@ -9,15 +9,21 @@ export interface ApiResponse<T = any> {
   message?: string
 }
 
-export interface PaginatedResponse<T = any> extends ApiResponse<T[]> {
-  pagination: {
-    page: number
-    limit: number
-    total: number
-    totalPages: number
-    hasNext: boolean
-    hasPrev: boolean
+export interface PaginatedResponse<T = any> {
+  success: boolean
+  data: {
+    users: T[]
+    pagination: {
+      page: number
+      limit: number
+      total: number
+      totalPages: number
+      hasNext: boolean
+      hasPrev: boolean
+    }
   }
+  error?: string
+  message?: string
 }
 
 // Create axios instance
@@ -320,10 +326,19 @@ export const analyticsApi = {
 export const usersApi = {
   getAll: (params?: { page?: number; limit?: number }) =>
     apiClient.get<PaginatedResponse<any>>('/users', { params }),
-  
+
   getById: (id: string) =>
     apiClient.get<ApiResponse<any>>(`/users/${id}`),
-  
+
+  create: (data: {
+    name: string
+    email: string
+    password: string
+    role: string
+    isActive: boolean
+  }) =>
+    apiClient.post<ApiResponse<any>>('/users', data),
+
   update: (id: string, data: Partial<{
     name: string
     email: string
@@ -331,7 +346,7 @@ export const usersApi = {
     isActive: boolean
   }>) =>
     apiClient.put<ApiResponse<any>>(`/users/${id}`, data),
-  
+
   delete: (id: string) =>
     apiClient.delete<ApiResponse<any>>(`/users/${id}`),
 }

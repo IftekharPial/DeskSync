@@ -28,6 +28,22 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import { Label } from '@/components/ui/label'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import {
   Table,
   TableBody,
   TableCell,
@@ -42,6 +58,14 @@ export default function UsersPage() {
   const queryClient = useQueryClient()
   const [searchTerm, setSearchTerm] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
+  const [isAddUserModalOpen, setIsAddUserModalOpen] = useState(false)
+  const [newUser, setNewUser] = useState({
+    name: '',
+    email: '',
+    password: '',
+    role: 'USER',
+    isActive: true
+  })
 
   // Check if user is admin
   const isAdmin = (session as any)?.user?.role === 'ADMIN'
@@ -55,7 +79,11 @@ export default function UsersPage() {
     ['users', currentPage, searchTerm],
     () => usersApi.getAll({ page: currentPage, limit: 10 }),
     {
-      select: (response) => response.data,
+      select: (response) => {
+        // The API returns { success: true, data: { users: [...], pagination: {...} } }
+        // Axios wraps this in response.data, so we need response.data.data
+        return response.data.data
+      },
       keepPreviousData: true,
     }
   )
@@ -81,10 +109,52 @@ export default function UsersPage() {
     }
   )
 
+  // Create user mutation
+  const createUserMutation = useMutation(
+    (userData: typeof newUser) => usersApi.create(userData),
+    {
+      onSuccess: () => {
+        queryClient.invalidateQueries(['users'])
+        setIsAddUserModalOpen(false)
+        setNewUser({
+          name: '',
+          email: '',
+          password: '',
+          role: 'USER',
+          isActive: true
+        })
+        toast({
+          title: 'User created',
+          description: 'User has been created successfully.',
+        })
+      },
+      onError: (error: any) => {
+        toast({
+          title: 'Error',
+          description: error?.response?.data?.error || 'Failed to create user. Please try again.',
+          variant: 'destructive',
+        })
+      },
+    }
+  )
+
   const handleDeleteUser = (userId: string, userName: string) => {
     if (confirm(`Are you sure you want to deactivate ${userName}?`)) {
       deleteUserMutation.mutate(userId)
     }
+  }
+
+  const handleCreateUser = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!newUser.name || !newUser.email || !newUser.password) {
+      toast({
+        title: 'Validation Error',
+        description: 'Please fill in all required fields.',
+        variant: 'destructive',
+      })
+      return
+    }
+    createUserMutation.mutate(newUser)
   }
 
   const getRoleBadgeVariant = (role: string) => {
@@ -127,7 +197,8 @@ export default function UsersPage() {
     )
   }
 
-  const users = usersData?.data || []
+  // Ensure users is always an array to prevent .filter() errors
+  const users = Array.isArray(usersData?.users) ? usersData.users : []
   const pagination = usersData?.pagination
 
   return (
@@ -140,7 +211,10 @@ export default function UsersPage() {
             Manage user accounts and permissions
           </p>
         </div>
-        <Button className="flex items-center space-x-2">
+        <Button
+          className="flex items-center space-x-2"
+          onClick={() => setIsAddUserModalOpen(true)}
+        >
           <UserPlus className="h-4 w-4" />
           <span>Add User</span>
         </Button>
@@ -154,7 +228,7 @@ export default function UsersPage() {
             <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{pagination?.total || 0}</div>
+            <div className="text-2xl font-bold">{pagination?.total || users.length}</div>
             <p className="text-xs text-muted-foreground">
               All registered users
             </p>
@@ -167,7 +241,7 @@ export default function UsersPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {users.filter((u: any) => u.isActive).length}
+              {users.filter((u: any) => u?.isActive).length}
             </div>
             <p className="text-xs text-muted-foreground">
               Currently active
@@ -181,7 +255,7 @@ export default function UsersPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {users.filter((u: any) => u.role === 'ADMIN').length}
+              {users.filter((u: any) => u?.role === 'ADMIN').length}
             </div>
             <p className="text-xs text-muted-foreground">
               Administrator accounts
@@ -195,7 +269,7 @@ export default function UsersPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {users.filter((u: any) => u.role === 'USER').length}
+              {users.filter((u: any) => u?.role === 'USER').length}
             </div>
             <p className="text-xs text-muted-foreground">
               Support team members
@@ -324,6 +398,95 @@ export default function UsersPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* Add User Modal */}
+      <Dialog open={isAddUserModalOpen} onOpenChange={setIsAddUserModalOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Add New User</DialogTitle>
+            <DialogDescription>
+              Create a new user account. Fill in the required information below.
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleCreateUser}>
+            <div className="grid gap-4 py-4">
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="name" className="text-right">
+                  Name *
+                </Label>
+                <Input
+                  id="name"
+                  value={newUser.name}
+                  onChange={(e) => setNewUser({ ...newUser, name: e.target.value })}
+                  className="col-span-3"
+                  placeholder="Enter full name"
+                  required
+                />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="email" className="text-right">
+                  Email *
+                </Label>
+                <Input
+                  id="email"
+                  type="email"
+                  value={newUser.email}
+                  onChange={(e) => setNewUser({ ...newUser, email: e.target.value })}
+                  className="col-span-3"
+                  placeholder="Enter email address"
+                  required
+                />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="password" className="text-right">
+                  Password *
+                </Label>
+                <Input
+                  id="password"
+                  type="password"
+                  value={newUser.password}
+                  onChange={(e) => setNewUser({ ...newUser, password: e.target.value })}
+                  className="col-span-3"
+                  placeholder="Enter password"
+                  required
+                />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="role" className="text-right">
+                  Role
+                </Label>
+                <Select
+                  value={newUser.role}
+                  onValueChange={(value) => setNewUser({ ...newUser, role: value })}
+                >
+                  <SelectTrigger className="col-span-3">
+                    <SelectValue placeholder="Select role" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="USER">User</SelectItem>
+                    <SelectItem value="ADMIN">Admin</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setIsAddUserModalOpen(false)}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                disabled={createUserMutation.isLoading}
+              >
+                {createUserMutation.isLoading ? 'Creating...' : 'Create User'}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
