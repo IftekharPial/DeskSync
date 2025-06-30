@@ -2,39 +2,15 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@dailysync/database'
-import { updateWebhookSchema } from '@dailysync/database'
 
-// CORS headers
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
   'Access-Control-Allow-Headers': 'Content-Type, Authorization',
 }
 
-// Handle preflight requests
 export async function OPTIONS() {
-  return new Response(null, { status: 200, headers: corsHeaders })
-}
-
-// Helper function to transform database webhook to API format
-function transformWebhookForAPI(webhook: any) {
-  return {
-    id: webhook.id,
-    name: webhook.name,
-    description: webhook.description,
-    url: webhook.url,
-    type: webhook.type,
-    secret: webhook.secret,
-    status: webhook.status,
-    createdAt: webhook.createdAt.toISOString(),
-    updatedAt: webhook.updatedAt.toISOString(),
-    creator: webhook.creator ? {
-      id: webhook.creator.id,
-      name: webhook.creator.name,
-      email: webhook.creator.email,
-    } : null,
-    _count: webhook._count || { payloadLogs: 0 },
-  }
+  return NextResponse.json({}, { headers: corsHeaders })
 }
 
 export async function GET(
@@ -55,34 +31,34 @@ export async function GET(
     const userId = (session as any)?.user?.id
     const isAdmin = (session as any)?.user?.role === 'ADMIN'
 
-    // Get webhook from database
-    const webhook = await prisma.incomingWebhook.findUnique({
+    const endpoint = await prisma.outgoingEndpoint.findUnique({
       where: { id: params.id },
       include: {
-        creator: {
+        messageTemplate: true,
+        incomingWebhook: {
           select: {
             id: true,
             name: true,
-            email: true,
+            createdBy: true,
           },
         },
         _count: {
           select: {
-            payloadLogs: true,
+            deliveryLogs: true,
           },
         },
       },
     })
 
-    if (!webhook) {
+    if (!endpoint) {
       return NextResponse.json(
-        { success: false, error: 'Webhook not found' },
+        { success: false, error: 'Endpoint not found' },
         { status: 404, headers: corsHeaders }
       )
     }
 
-    // Non-admin users can only view their own webhooks
-    if (!isAdmin && webhook.createdBy !== userId) {
+    // Non-admin users can only view their own webhook endpoints
+    if (!isAdmin && endpoint.incomingWebhook.createdBy !== userId) {
       return NextResponse.json(
         { success: false, error: 'Forbidden - Access denied' },
         { status: 403, headers: corsHeaders }
@@ -91,11 +67,11 @@ export async function GET(
 
     return NextResponse.json({
       success: true,
-      data: transformWebhookForAPI(webhook)
+      data: endpoint,
     }, { headers: corsHeaders })
 
   } catch (error) {
-    console.error('Webhook GET error:', error)
+    console.error('Endpoint GET error:', error)
     return NextResponse.json(
       { success: false, error: 'Internal server error' },
       { status: 500, headers: corsHeaders }
@@ -121,20 +97,26 @@ export async function PUT(
     const userId = (session as any)?.user?.id
     const isAdmin = (session as any)?.user?.role === 'ADMIN'
 
-    // Check if webhook exists and user has permission
-    const existingWebhook = await prisma.incomingWebhook.findUnique({
+    const endpoint = await prisma.outgoingEndpoint.findUnique({
       where: { id: params.id },
+      include: {
+        incomingWebhook: {
+          select: {
+            createdBy: true,
+          },
+        },
+      },
     })
 
-    if (!existingWebhook) {
+    if (!endpoint) {
       return NextResponse.json(
-        { success: false, error: 'Webhook not found' },
+        { success: false, error: 'Endpoint not found' },
         { status: 404, headers: corsHeaders }
       )
     }
 
-    // Non-admin users can only update their own webhooks
-    if (!isAdmin && existingWebhook.createdBy !== userId) {
+    // Non-admin users can only update their own webhook endpoints
+    if (!isAdmin && endpoint.incomingWebhook.createdBy !== userId) {
       return NextResponse.json(
         { success: false, error: 'Forbidden - Access denied' },
         { status: 403, headers: corsHeaders }
@@ -142,35 +124,25 @@ export async function PUT(
     }
 
     const body = await request.json()
+    const { name, url, method, headers, isActive, retryAttempts, retryDelayMs, timeoutMs } = body
 
-    // Validate request body
-    const validation = updateWebhookSchema.safeParse(body)
-    if (!validation.success) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: 'Invalid webhook data',
-          details: validation.error.errors
-        },
-        { status: 400, headers: corsHeaders }
-      )
-    }
-
-    // Update webhook in database
-    const updatedWebhook = await prisma.incomingWebhook.update({
+    const updatedEndpoint = await prisma.outgoingEndpoint.update({
       where: { id: params.id },
-      data: validation.data,
+      data: {
+        ...(name !== undefined && { name }),
+        ...(url !== undefined && { url }),
+        ...(method !== undefined && { method }),
+        ...(headers !== undefined && { headers }),
+        ...(isActive !== undefined && { isActive }),
+        ...(retryAttempts !== undefined && { retryAttempts }),
+        ...(retryDelayMs !== undefined && { retryDelayMs }),
+        ...(timeoutMs !== undefined && { timeoutMs }),
+      },
       include: {
-        creator: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-          },
-        },
+        messageTemplate: true,
         _count: {
           select: {
-            payloadLogs: true,
+            deliveryLogs: true,
           },
         },
       },
@@ -178,12 +150,12 @@ export async function PUT(
 
     return NextResponse.json({
       success: true,
-      data: transformWebhookForAPI(updatedWebhook),
-      message: 'Webhook updated successfully'
+      data: updatedEndpoint,
+      message: 'Endpoint updated successfully',
     }, { headers: corsHeaders })
 
   } catch (error) {
-    console.error('Webhook PUT error:', error)
+    console.error('Endpoint PUT error:', error)
     return NextResponse.json(
       { success: false, error: 'Internal server error' },
       { status: 500, headers: corsHeaders }
@@ -209,46 +181,43 @@ export async function DELETE(
     const userId = (session as any)?.user?.id
     const isAdmin = (session as any)?.user?.role === 'ADMIN'
 
-    // Check if webhook exists and user has permission
-    const existingWebhook = await prisma.incomingWebhook.findUnique({
+    const endpoint = await prisma.outgoingEndpoint.findUnique({
       where: { id: params.id },
       include: {
-        _count: {
+        incomingWebhook: {
           select: {
-            payloadLogs: true,
-            outgoingEndpoints: true,
+            createdBy: true,
           },
         },
       },
     })
 
-    if (!existingWebhook) {
+    if (!endpoint) {
       return NextResponse.json(
-        { success: false, error: 'Webhook not found' },
+        { success: false, error: 'Endpoint not found' },
         { status: 404, headers: corsHeaders }
       )
     }
 
-    // Non-admin users can only delete their own webhooks
-    if (!isAdmin && existingWebhook.createdBy !== userId) {
+    // Non-admin users can only delete their own webhook endpoints
+    if (!isAdmin && endpoint.incomingWebhook.createdBy !== userId) {
       return NextResponse.json(
         { success: false, error: 'Forbidden - Access denied' },
         { status: 403, headers: corsHeaders }
       )
     }
 
-    // Delete the webhook (this will cascade to related records due to database constraints)
-    await prisma.incomingWebhook.delete({
-      where: { id: params.id }
+    await prisma.outgoingEndpoint.delete({
+      where: { id: params.id },
     })
 
     return NextResponse.json({
       success: true,
-      message: 'Webhook deleted successfully'
+      message: 'Endpoint deleted successfully',
     }, { headers: corsHeaders })
 
   } catch (error) {
-    console.error('Webhook DELETE error:', error)
+    console.error('Endpoint DELETE error:', error)
     return NextResponse.json(
       { success: false, error: 'Internal server error' },
       { status: 500, headers: corsHeaders }

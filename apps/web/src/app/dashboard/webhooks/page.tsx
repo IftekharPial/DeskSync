@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { useSession } from 'next-auth/react'
 import { useQuery } from 'react-query'
-import { webhooksApi } from '@/lib/api'
+import { webhooksApi, analyticsApi } from '@/lib/api'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { LoadingSpinner } from '@/components/ui/loading-spinner'
@@ -33,33 +33,22 @@ export default function WebhooksPage() {
     () => webhooksApi.getAll({ page: 1, limit: 5 }),
     {
       select: (response) => {
-        // Ensure we always return a valid structure
-        if (!response?.data) {
-          return { webhooks: [], pagination: null }
+        // The webhooks API returns { success: true, data: [...], pagination: {...} }
+        // Axios wraps this in response.data, so we access response.data directly
+        return {
+          webhooks: response.data.data || [],
+          pagination: response.data.pagination || null
         }
-
-        // Type assertion to handle PaginatedResponse type mismatch
-        const responseData = response.data as any
-        if (Array.isArray(responseData)) {
-          return { webhooks: responseData, pagination: null }
-        }
-
-        if (responseData.webhooks && Array.isArray(responseData.webhooks)) {
-          return {
-            webhooks: responseData.webhooks,
-            pagination: responseData.pagination || null
-          }
-        }
-
-        if (responseData.data && Array.isArray(responseData.data)) {
-          return {
-            webhooks: responseData.data,
-            pagination: responseData.pagination || null
-          }
-        }
-
-        return { webhooks: [], pagination: null }
       },
+    }
+  )
+
+  // Get webhook analytics for accurate counts
+  const { data: analyticsData, isLoading: loadingAnalytics } = useQuery(
+    'webhook-analytics',
+    () => analyticsApi.getWebhookAnalytics(),
+    {
+      select: (response) => response.data.data,
     }
   )
 
@@ -126,7 +115,7 @@ export default function WebhooksPage() {
             </div>
             <div className="text-center p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
               <div className="text-2xl font-bold text-blue-600 dark:text-blue-400 mb-1">
-                {Array.isArray(webhooksData?.webhooks) ? webhooksData.webhooks.length : 0}
+                {analyticsData?.activeWebhooks ?? 0}
               </div>
               <div className="text-sm text-muted-foreground">Active Webhooks</div>
             </div>

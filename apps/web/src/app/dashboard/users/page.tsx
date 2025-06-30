@@ -59,10 +59,17 @@ export default function UsersPage() {
   const [searchTerm, setSearchTerm] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
   const [isAddUserModalOpen, setIsAddUserModalOpen] = useState(false)
+  const [isEditUserModalOpen, setIsEditUserModalOpen] = useState(false)
+  const [editingUser, setEditingUser] = useState<any>(null)
   const [newUser, setNewUser] = useState({
     name: '',
     email: '',
     password: '',
+    role: 'USER',
+    isActive: true
+  })
+  const [editUser, setEditUser] = useState({
+    name: '',
     role: 'USER',
     isActive: true
   })
@@ -138,6 +145,34 @@ export default function UsersPage() {
     }
   )
 
+  // Update user mutation
+  const updateUserMutation = useMutation(
+    ({ id, data }: { id: string; data: typeof editUser }) => usersApi.update(id, data),
+    {
+      onSuccess: () => {
+        queryClient.invalidateQueries(['users'])
+        setIsEditUserModalOpen(false)
+        setEditingUser(null)
+        setEditUser({
+          name: '',
+          role: 'USER',
+          isActive: true
+        })
+        toast({
+          title: 'User updated',
+          description: 'User has been updated successfully.',
+        })
+      },
+      onError: (error: any) => {
+        toast({
+          title: 'Error',
+          description: error.response?.data?.error || 'Failed to update user.',
+          variant: 'destructive',
+        })
+      },
+    }
+  )
+
   const handleDeleteUser = (userId: string, userName: string) => {
     if (confirm(`Are you sure you want to deactivate ${userName}?`)) {
       deleteUserMutation.mutate(userId)
@@ -155,6 +190,34 @@ export default function UsersPage() {
       return
     }
     createUserMutation.mutate(newUser)
+  }
+
+  const handleEditUser = (user: any) => {
+    setEditingUser(user)
+    setEditUser({
+      name: user.name,
+      role: user.role,
+      isActive: user.isActive
+    })
+    setIsEditUserModalOpen(true)
+  }
+
+  const handleUpdateUser = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!editUser.name) {
+      toast({
+        title: 'Validation Error',
+        description: 'Please fill in all required fields.',
+        variant: 'destructive',
+      })
+      return
+    }
+    if (editingUser) {
+      updateUserMutation.mutate({
+        id: editingUser.id,
+        data: editUser
+      })
+    }
   }
 
   const getRoleBadgeVariant = (role: string) => {
@@ -347,7 +410,7 @@ export default function UsersPage() {
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            <DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleEditUser(user)}>
                               <Edit className="mr-2 h-4 w-4" />
                               Edit
                             </DropdownMenuItem>
@@ -482,6 +545,82 @@ export default function UsersPage() {
                 disabled={createUserMutation.isLoading}
               >
                 {createUserMutation.isLoading ? 'Creating...' : 'Create User'}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit User Modal */}
+      <Dialog open={isEditUserModalOpen} onOpenChange={setIsEditUserModalOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Edit User</DialogTitle>
+            <DialogDescription>
+              Update user information. Modify the fields below.
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleUpdateUser}>
+            <div className="grid gap-4 py-4">
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="edit-name" className="text-right">
+                  Name *
+                </Label>
+                <Input
+                  id="edit-name"
+                  value={editUser.name}
+                  onChange={(e) => setEditUser({ ...editUser, name: e.target.value })}
+                  className="col-span-3"
+                  placeholder="Enter full name"
+                  required
+                />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="edit-role" className="text-right">
+                  Role
+                </Label>
+                <Select
+                  value={editUser.role}
+                  onValueChange={(value) => setEditUser({ ...editUser, role: value })}
+                >
+                  <SelectTrigger className="col-span-3">
+                    <SelectValue placeholder="Select role" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="USER">User</SelectItem>
+                    <SelectItem value="ADMIN">Admin</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="edit-status" className="text-right">
+                  Status
+                </Label>
+                <Select
+                  value={editUser.isActive ? 'active' : 'inactive'}
+                  onValueChange={(value) => setEditUser({ ...editUser, isActive: value === 'active' })}
+                >
+                  <SelectTrigger className="col-span-3">
+                    <SelectValue placeholder="Select status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="active">Active</SelectItem>
+                    <SelectItem value="inactive">Inactive</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setIsEditUserModalOpen(false)}
+                disabled={updateUserMutation.isLoading}
+              >
+                Cancel
+              </Button>
+              <Button type="submit" disabled={updateUserMutation.isLoading}>
+                {updateUserMutation.isLoading ? 'Updating...' : 'Update User'}
               </Button>
             </DialogFooter>
           </form>

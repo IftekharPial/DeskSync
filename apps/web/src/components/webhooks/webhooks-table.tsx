@@ -58,10 +58,10 @@ export function WebhooksTable({ onEdit }: WebhooksTableProps) {
     () => webhooksApi.getAll({ page, limit: 10 }),
     {
       select: (response) => {
-        // The API returns: { success: true, data: [...webhooks...], pagination: {...} }
-        // Extract webhooks and pagination from the response
-        const webhooks = Array.isArray(response?.data) ? response.data : []
-        const pagination = response?.pagination || null
+        // The webhooks API returns { success: true, data: [...], pagination: {...} }
+        // Axios wraps this in response.data, so we access response.data directly
+        const webhooks = Array.isArray(response.data.data) ? response.data.data : []
+        const pagination = response.data.pagination || null
 
         return { webhooks, pagination }
       },

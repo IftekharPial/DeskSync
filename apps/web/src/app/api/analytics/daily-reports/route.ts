@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
+import { prisma } from '@dailysync/database'
 
 // Add CORS headers
 const corsHeaders = {
@@ -25,26 +26,121 @@ export async function GET(request: NextRequest) {
       )
     }
 
+    const userId = (session as any)?.user?.id
     const isAdmin = (session as any)?.user?.role === 'ADMIN'
 
-    // Mock daily reports data
-    const mockData = {
-      reportCount: 42,
-      completionRate: 95.5,
-      averageScore: 8.7,
-      trend: 12,
-      dailyData: [
-        { date: '2024-01-01', reports: 15, completionRate: 100, averageScore: 9.2 },
-        { date: '2024-01-02', reports: 18, completionRate: 94, averageScore: 8.8 },
-        { date: '2024-01-03', reports: 16, completionRate: 96, averageScore: 9.0 },
-        { date: '2024-01-04', reports: 20, completionRate: 90, averageScore: 8.5 },
-        { date: '2024-01-05', reports: 14, completionRate: 100, averageScore: 9.3 }
-      ]
+    // Build where clause for user access control
+    const whereClause: any = {}
+    if (!isAdmin) {
+      whereClause.userId = userId
+    }
+
+    // Get date range (last 30 days)
+    const endDate = new Date()
+    const startDate = new Date()
+    startDate.setDate(startDate.getDate() - 30)
+
+    // Get real daily reports analytics from database
+    const [
+      totalReports,
+      reportsInRange,
+      aggregatedStats,
+      dailyBreakdown
+    ] = await Promise.all([
+      // Total reports count
+      prisma.dailyReport.count({ where: whereClause }),
+
+      // Reports in date range
+      prisma.dailyReport.count({
+        where: {
+          ...whereClause,
+          date: {
+            gte: startDate,
+            lte: endDate
+          }
+        }
+      }),
+
+      // Aggregated statistics
+      prisma.dailyReport.aggregate({
+        where: {
+          ...whereClause,
+          date: {
+            gte: startDate,
+            lte: endDate
+          }
+        },
+        _sum: {
+          ticketsResolved: true,
+          chatsHandled: true,
+          githubIssues: true,
+          emailsProcessed: true,
+          callsAttended: true
+        },
+        _avg: {
+          ticketsResolved: true,
+          chatsHandled: true,
+          githubIssues: true,
+          emailsProcessed: true,
+          callsAttended: true
+        }
+      }),
+
+      // Daily breakdown for the last 7 days
+      prisma.dailyReport.findMany({
+        where: {
+          ...whereClause,
+          date: {
+            gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
+            lte: endDate
+          }
+        },
+        select: {
+          date: true,
+          ticketsResolved: true,
+          chatsHandled: true,
+          githubIssues: true,
+          emailsProcessed: true,
+          callsAttended: true,
+          user: {
+            select: {
+              name: true
+            }
+          }
+        },
+        orderBy: {
+          date: 'desc'
+        }
+      })
+    ])
+
+    const analyticsData = {
+      reportCount: totalReports,
+      reportsInRange,
+      totalTickets: aggregatedStats._sum.ticketsResolved || 0,
+      totalChats: aggregatedStats._sum.chatsHandled || 0,
+      totalGithubIssues: aggregatedStats._sum.githubIssues || 0,
+      totalEmails: aggregatedStats._sum.emailsProcessed || 0,
+      totalCalls: aggregatedStats._sum.callsAttended || 0,
+      averageTickets: Math.round((aggregatedStats._avg.ticketsResolved || 0) * 100) / 100,
+      averageChats: Math.round((aggregatedStats._avg.chatsHandled || 0) * 100) / 100,
+      averageGithubIssues: Math.round((aggregatedStats._avg.githubIssues || 0) * 100) / 100,
+      averageEmails: Math.round((aggregatedStats._avg.emailsProcessed || 0) * 100) / 100,
+      averageCalls: Math.round((aggregatedStats._avg.callsAttended || 0) * 100) / 100,
+      dailyData: dailyBreakdown.map(report => ({
+        date: report.date.toISOString().split('T')[0],
+        tickets: report.ticketsResolved,
+        chats: report.chatsHandled,
+        githubIssues: report.githubIssues,
+        emails: report.emailsProcessed,
+        calls: report.callsAttended,
+        userName: report.user?.name
+      }))
     }
 
     return NextResponse.json({
       success: true,
-      data: mockData
+      data: analyticsData
     }, { headers: corsHeaders })
 
   } catch (error) {
