@@ -75,7 +75,7 @@ export function WebhooksTable({ onEdit }: WebhooksTableProps) {
         title: 'Success',
         description: 'Webhook deleted successfully',
       })
-      queryClient.invalidateQueries('webhooks')
+      queryClient.invalidateQueries(['webhooks'])
       queryClient.invalidateQueries('webhooks-overview')
       setDeleteId(null)
     },

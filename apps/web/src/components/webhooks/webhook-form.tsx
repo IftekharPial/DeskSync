@@ -59,7 +59,7 @@ export function WebhookForm({ initialData, onSuccess, onCancel }: WebhookFormPro
         title: 'Success',
         description: 'Webhook created successfully',
       })
-      queryClient.invalidateQueries('webhooks')
+      queryClient.invalidateQueries(['webhooks'])
       queryClient.invalidateQueries('webhooks-overview')
       onSuccess?.()
     },
@@ -80,7 +80,7 @@ export function WebhookForm({ initialData, onSuccess, onCancel }: WebhookFormPro
           title: 'Success',
           description: 'Webhook updated successfully',
         })
-        queryClient.invalidateQueries('webhooks')
+        queryClient.invalidateQueries(['webhooks'])
         queryClient.invalidateQueries('webhooks-overview')
         onSuccess?.()
       },
