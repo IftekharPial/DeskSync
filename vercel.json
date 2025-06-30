@@ -1,0 +1,21 @@
+{
+  "buildCommand": "pnpm --filter @dailysync/database exec prisma generate && pnpm --filter @dailysync/web run build",
+  "installCommand": "pnpm install",
+  "functions": {
+    "apps/api/src/index-simple.ts": {
+      "runtime": "nodejs18.x"
+    }
+  },
+  "rewrites": [
+    {
+      "source": "/api/(.*)",
+      "destination": "/api/$1"
+    }
+  ],
+  "env": {
+    "NODE_ENV": "production",
+    "SKIP_ENV_VALIDATION": "1",
+    "DATABASE_URL": "postgresql://dummy:dummy@localhost:5432/dummy",
+    "NEXTAUTH_SECRET": "dummy-secret-for-build"
+  }
+}

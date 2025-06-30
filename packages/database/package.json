@@ -1,0 +1,29 @@
+{
+  "name": "@dailysync/database",
+  "version": "1.0.0",
+  "description": "Database schema and utilities for DailySync",
+  "main": "src/index.ts",
+  "scripts": {
+    "generate": "prisma generate",
+    "migrate:deploy": "prisma migrate deploy",
+    "postinstall": "prisma generate",
+    "db:generate": "prisma generate",
+    "db:push": "prisma db push",
+    "db:migrate": "prisma migrate dev",
+    "db:studio": "prisma studio",
+    "db:seed": "tsx src/seed.ts",
+    "build": "tsc --skipLibCheck",
+    "build:declarations": "tsc --emitDeclarationOnly --skipLibCheck",
+    "type-check": "tsc --noEmit --skipLibCheck"
+  },
+  "dependencies": {
+    "@prisma/client": "^5.6.0",
+    "bcryptjs": "^2.4.3",
+    "zod": "^3.22.4"
+  },
+  "devDependencies": {
+    "prisma": "^5.6.0",
+    "tsx": "^4.1.0",
+    "@types/bcryptjs": "^2.4.6"
+  }
+}

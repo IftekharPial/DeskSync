@@ -1,0 +1,40 @@
+{
+  "name": "dailysync-saas",
+  "version": "1.0.0",
+  "description": "DailySync - Support Portal & Middleware SaaS",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "turbo run dev",
+    "build": "turbo run build",
+    "start": "turbo run start",
+    "lint": "turbo run lint",
+    "type-check": "turbo run type-check",
+    "clean": "turbo run clean",
+    "test": "turbo run test",
+    "db:generate": "turbo run db:generate",
+    "db:push": "turbo run db:push",
+    "db:migrate": "turbo run db:migrate",
+    "db:studio": "turbo run db:studio",
+    "vercel-build": "pnpm --filter @dailysync/database exec prisma generate && pnpm --filter @dailysync/web run build",
+    "postinstall": "pnpm --filter @dailysync/database exec prisma generate",
+    "build:database": "pnpm --filter @dailysync/database exec prisma generate",
+    "build:web": "pnpm --filter @dailysync/web run build"
+  },
+  "devDependencies": {
+    "turbo": "^1.10.16",
+    "@types/node": "^20.8.0",
+    "typescript": "^5.2.2",
+    "prettier": "^3.0.3",
+    "eslint": "^8.51.0",
+    "@typescript-eslint/eslint-plugin": "^6.7.4",
+    "@typescript-eslint/parser": "^6.7.4"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=9.0.0"
+  }
+}

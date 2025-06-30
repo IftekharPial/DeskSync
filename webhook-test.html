@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DailySync Webhook Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        .result {
+            margin-top: 10px;
+            padding: 10px;
+            border-radius: 5px;
+            background: #f8f9fa;
+            border-left: 4px solid #007bff;
+        }
+        .success {
+            border-left-color: #28a745;
+            background: #d4edda;
+        }
+        .error {
+            border-left-color: #dc3545;
+            background: #f8d7da;
+        }
+        pre {
+            background: #f8f9fa;
+            padding: 10px;
+            border-radius: 5px;
+            overflow-x: auto;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚀 DailySync Webhook Test</h1>
+        
+        <div class="test-section">
+            <h3>1. Test Meeting Webhook (ID: 2)</h3>
+            <p>This will test the meeting webhook functionality by sending a test payload.</p>
+            <button onclick="testMeetingWebhook()">Test Meeting Webhook</button>
+            <div id="meeting-result" class="result" style="display: none;"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>2. Test Generic Webhook (ID: 1)</h3>
+            <p>This will test the generic webhook functionality.</p>
+            <button onclick="testGenericWebhook()">Test Generic Webhook</button>
+            <div id="generic-result" class="result" style="display: none;"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>3. Check Meeting Reports</h3>
+            <p>View all meeting reports to see if new meetings were created.</p>
+            <button onclick="checkMeetingReports()">Check Meeting Reports</button>
+            <div id="reports-result" class="result" style="display: none;"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>4. Check Message Templates</h3>
+            <p>View available message templates for webhooks.</p>
+            <button onclick="checkTemplates()">Check Templates</button>
+            <div id="templates-result" class="result" style="display: none;"></div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:3001';
+
+        async function testMeetingWebhook() {
+            const resultDiv = document.getElementById('meeting-result');
+            resultDiv.style.display = 'block';
+            resultDiv.innerHTML = '⏳ Testing meeting webhook...';
+            resultDiv.className = 'result';
+
+            try {
+                const response = await fetch(`${API_BASE}/api/webhooks/2/test`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        hostId: '12345',
+                        meetingTitle: 'Test Meeting - Client Demo',
+                        startTime: new Date().toISOString(),
+                        duration: 45,
+                        clientName: 'Test Client Corp',
+                        notes: 'This is a test meeting created from webhook test',
+                        attendees: ['test.client@example.com'],
+                        actionItems: ['Follow up with client', 'Send demo materials']
+                    })
+                });
+
+                const result = await response.json();
+                resultDiv.className = 'result success';
+                resultDiv.innerHTML = `
+                    <h4>✅ Meeting Webhook Test Successful!</h4>
+                    <pre>${JSON.stringify(result, null, 2)}</pre>
+                `;
+            } catch (error) {
+                resultDiv.className = 'result error';
+                resultDiv.innerHTML = `
+                    <h4>❌ Meeting Webhook Test Failed</h4>
+                    <p>Error: ${error.message}</p>
+                `;
+            }
+        }
+
+        async function testGenericWebhook() {
+            const resultDiv = document.getElementById('generic-result');
+            resultDiv.style.display = 'block';
+            resultDiv.innerHTML = '⏳ Testing generic webhook...';
+            resultDiv.className = 'result';
+
+            try {
+                const response = await fetch(`${API_BASE}/api/webhooks/1/test`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        title: 'Test Notification',
+                        message: 'This is a test payload from the webhook test feature',
+                        timestamp: new Date().toISOString(),
+                        user: 'Test User',
+                        type: 'test'
+                    })
+                });
+
+                const result = await response.json();
+                resultDiv.className = 'result success';
+                resultDiv.innerHTML = `
+                    <h4>✅ Generic Webhook Test Successful!</h4>
+                    <pre>${JSON.stringify(result, null, 2)}</pre>
+                `;
+            } catch (error) {
+                resultDiv.className = 'result error';
+                resultDiv.innerHTML = `
+                    <h4>❌ Generic Webhook Test Failed</h4>
+                    <p>Error: ${error.message}</p>
+                `;
+            }
+        }
+
+        async function checkMeetingReports() {
+            const resultDiv = document.getElementById('reports-result');
+            resultDiv.style.display = 'block';
+            resultDiv.innerHTML = '⏳ Checking meeting reports...';
+            resultDiv.className = 'result';
+
+            try {
+                const response = await fetch(`${API_BASE}/api/reports/meeting`);
+                const result = await response.json();
+                resultDiv.className = 'result success';
+                resultDiv.innerHTML = `
+                    <h4>📋 Meeting Reports (${result.data?.length || 0} total)</h4>
+                    <pre>${JSON.stringify(result, null, 2)}</pre>
+                `;
+            } catch (error) {
+                resultDiv.className = 'result error';
+                resultDiv.innerHTML = `
+                    <h4>❌ Failed to Check Meeting Reports</h4>
+                    <p>Error: ${error.message}</p>
+                `;
+            }
+        }
+
+        async function checkTemplates() {
+            const resultDiv = document.getElementById('templates-result');
+            resultDiv.style.display = 'block';
+            resultDiv.innerHTML = '⏳ Checking message templates...';
+            resultDiv.className = 'result';
+
+            try {
+                const response = await fetch(`${API_BASE}/api/message-templates`);
+                const result = await response.json();
+                resultDiv.className = 'result success';
+                resultDiv.innerHTML = `
+                    <h4>📝 Message Templates (${result.data?.length || 0} total)</h4>
+                    <pre>${JSON.stringify(result, null, 2)}</pre>
+                `;
+            } catch (error) {
+                resultDiv.className = 'result error';
+                resultDiv.innerHTML = `
+                    <h4>❌ Failed to Check Templates</h4>
+                    <p>Error: ${error.message}</p>
+                `;
+            }
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Frontend API Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 10px 5px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        .result {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 5px;
+            background: #f8f9fa;
+            border-left: 4px solid #007bff;
+            white-space: pre-wrap;
+            font-family: monospace;
+            font-size: 12px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .success {
+            border-left-color: #28a745;
+            background: #d4edda;
+        }
+        .error {
+            border-left-color: #dc3545;
+            background: #f8d7da;
+        }
+        .webhook-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        .webhook-table th, .webhook-table td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+        .webhook-table th {
+            background-color: #f2f2f2;
+        }
+        .webhook-url {
+            font-family: monospace;
+            background: #f8f9fa;
+            padding: 2px 4px;
+            border-radius: 3px;
+            font-size: 11px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 Frontend API Direct Test</h1>
+        <p>This page tests the frontend API calls directly to debug the webhook URL display issue.</p>
+        
+        <div>
+            <button onclick="testWebhooksAPI()">Test Webhooks API</button>
+            <button onclick="testIndividualWebhook()">Test Individual Webhook</button>
+            <button onclick="testWebhookReceive()">Test Webhook Receive (POST)</button>
+            <button onclick="clearResults()">Clear Results</button>
+        </div>
+        
+        <div id="result" class="result" style="display: none;"></div>
+        <div id="webhook-display" style="display: none;">
+            <h3>Webhook Display Test:</h3>
+            <table class="webhook-table" id="webhook-table">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Name</th>
+                        <th>URL</th>
+                        <th>Status</th>
+                        <th>Type</th>
+                    </tr>
+                </thead>
+                <tbody id="webhook-tbody">
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        async function testWebhooksAPI() {
+            showResult('Testing webhooks API...', 'info');
+            
+            try {
+                const response = await fetch('http://localhost:3001/api/webhooks?page=1&limit=10');
+                const data = await response.json();
+                
+                let result = `✅ Webhooks API Test Results:\n\n`;
+                result += `Status: ${response.status}\n`;
+                result += `Success: ${data.success}\n`;
+                result += `Data Type: ${Array.isArray(data.data) ? 'Array' : typeof data.data}\n`;
+                result += `Webhooks Count: ${data.data?.length || 0}\n\n`;
+                
+                if (data.data && data.data.length > 0) {
+                    result += `First Webhook Details:\n`;
+                    const webhook = data.data[0];
+                    result += `- ID: ${webhook.id}\n`;
+                    result += `- Name: ${webhook.name}\n`;
+                    result += `- URL: ${webhook.url}\n`;
+                    result += `- Status: ${webhook.status}\n`;
+                    result += `- Type: ${webhook.type}\n`;
+                    result += `- Description: ${webhook.description}\n\n`;
+                    
+                    result += `URL Analysis:\n`;
+                    result += `- URL exists: ${!!webhook.url}\n`;
+                    result += `- URL type: ${typeof webhook.url}\n`;
+                    result += `- URL value: "${webhook.url}"\n`;
+                    result += `- Complete URL: http://localhost:3001${webhook.url}\n\n`;
+                    
+                    // Display webhooks in table
+                    displayWebhooks(data.data);
+                }
+                
+                result += `\nFull Response:\n${JSON.stringify(data, null, 2)}`;
+                showResult(result, 'success');
+                
+            } catch (error) {
+                showResult(`❌ Error: ${error.message}`, 'error');
+            }
+        }
+        
+        async function testIndividualWebhook() {
+            showResult('Testing individual webhook API...', 'info');
+            
+            try {
+                const response = await fetch('http://localhost:3001/api/webhooks/1');
+                const data = await response.json();
+                
+                let result = `✅ Individual Webhook Test Results:\n\n`;
+                result += `Status: ${response.status}\n`;
+                result += `Success: ${data.success}\n\n`;
+                
+                if (data.data) {
+                    const webhook = data.data;
+                    result += `Webhook Details:\n`;
+                    result += `- ID: ${webhook.id}\n`;
+                    result += `- Name: ${webhook.name}\n`;
+                    result += `- URL: ${webhook.url}\n`;
+                    result += `- Status: ${webhook.status}\n`;
+                    result += `- Type: ${webhook.type}\n\n`;
+                    
+                    result += `URL Analysis:\n`;
+                    result += `- URL exists: ${!!webhook.url}\n`;
+                    result += `- URL type: ${typeof webhook.url}\n`;
+                    result += `- URL value: "${webhook.url}"\n`;
+                    result += `- Complete URL: http://localhost:3001${webhook.url}\n`;
+                }
+                
+                result += `\nFull Response:\n${JSON.stringify(data, null, 2)}`;
+                showResult(result, 'success');
+                
+            } catch (error) {
+                showResult(`❌ Error: ${error.message}`, 'error');
+            }
+        }
+        
+        async function testWebhookReceive() {
+            showResult('Testing webhook receive endpoint...', 'info');
+            
+            try {
+                const testPayload = {
+                    test: true,
+                    message: 'Frontend direct test',
+                    timestamp: new Date().toISOString()
+                };
+                
+                const response = await fetch('http://localhost:3001/api/webhooks/1/receive', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(testPayload)
+                });
+                const data = await response.json();
+                
+                let result = `✅ Webhook Receive Test Results:\n\n`;
+                result += `Status: ${response.status}\n`;
+                result += `Success: ${data.success}\n`;
+                result += `Message: ${data.message}\n\n`;
+                
+                if (data.data) {
+                    result += `Response Data:\n`;
+                    result += `- Received: ${data.data.received}\n`;
+                    result += `- Processed At: ${data.data.processedAt}\n`;
+                    result += `- Webhook Type: ${data.data.webhookType}\n`;
+                    result += `- Delivery Results: ${data.data.deliveryResults?.length || 0} endpoints\n`;
+                }
+                
+                result += `\nFull Response:\n${JSON.stringify(data, null, 2)}`;
+                showResult(result, 'success');
+                
+            } catch (error) {
+                showResult(`❌ Error: ${error.message}`, 'error');
+            }
+        }
+        
+        function displayWebhooks(webhooks) {
+            const tbody = document.getElementById('webhook-tbody');
+            tbody.innerHTML = '';
+            
+            webhooks.forEach(webhook => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${webhook.id}</td>
+                    <td>${webhook.name}</td>
+                    <td><span class="webhook-url">${webhook.url || 'undefined'}</span></td>
+                    <td>${webhook.status}</td>
+                    <td>${webhook.type}</td>
+                `;
+                tbody.appendChild(row);
+            });
+            
+            document.getElementById('webhook-display').style.display = 'block';
+        }
+        
+        function showResult(message, type) {
+            const resultDiv = document.getElementById('result');
+            resultDiv.innerHTML = message;
+            resultDiv.className = `result ${type}`;
+            resultDiv.style.display = 'block';
+        }
+        
+        function clearResults() {
+            document.getElementById('result').style.display = 'none';
+            document.getElementById('webhook-display').style.display = 'none';
+        }
+    </script>
+</body>
+</html>

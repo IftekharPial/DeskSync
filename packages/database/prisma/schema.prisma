@@ -1,0 +1,210 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  USER
+  ADMIN
+}
+
+enum WebhookStatus {
+  ACTIVE
+  INACTIVE
+  PAUSED
+}
+
+enum WebhookType {
+  GENERIC
+  MEETING
+}
+
+enum MeetingOutcome {
+  COMPLETED
+  CANCELLED
+  NO_SHOW
+  RESCHEDULED
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String
+  password  String
+  role      UserRole @default(USER)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  dailyReports   DailyReport[]
+  meetingReports MeetingReport[]
+  createdWebhooks IncomingWebhook[] @relation("WebhookCreator")
+
+  @@map("users")
+}
+
+model IncomingWebhook {
+  id          String        @id @default(cuid())
+  name        String
+  description String?
+  url         String        @unique // Generated webhook URL path
+  type        WebhookType   @default(GENERIC)
+  secret      String?
+  status      WebhookStatus @default(ACTIVE)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  createdBy   String
+
+  // Relations
+  creator           User                @relation("WebhookCreator", fields: [createdBy], references: [id])
+  messageTemplates  MessageTemplate[]
+  outgoingEndpoints OutgoingEndpoint[]
+  payloadLogs       PayloadLog[]
+
+  @@map("incoming_webhooks")
+}
+
+model MessageTemplate {
+  id                String   @id @default(cuid())
+  name              String
+  template          String   // Template string with placeholders
+  variables         String[] // Array of template variables
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  incomingWebhookId String
+
+  // Relations
+  incomingWebhook IncomingWebhook @relation(fields: [incomingWebhookId], references: [id], onDelete: Cascade)
+  outgoingEndpoint OutgoingEndpoint?
+
+  @@map("message_templates")
+}
+
+model OutgoingEndpoint {
+  id                String   @id @default(cuid())
+  name              String
+  url               String
+  method            String   @default("POST")
+  headers           Json?
+  isActive          Boolean  @default(true)
+  retryAttempts     Int      @default(3)
+  retryDelayMs      Int      @default(1000)
+  timeoutMs         Int      @default(30000)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  incomingWebhookId String
+  messageTemplateId String?  @unique
+
+  // Relations
+  incomingWebhook IncomingWebhook @relation(fields: [incomingWebhookId], references: [id], onDelete: Cascade)
+  messageTemplate MessageTemplate? @relation(fields: [messageTemplateId], references: [id])
+  deliveryLogs    DeliveryLog[]
+
+  @@map("outgoing_endpoints")
+}
+
+model PayloadLog {
+  id                String   @id @default(cuid())
+  payload           Json
+  headers           Json?
+  userAgent         String?
+  ipAddress         String?
+  receivedAt        DateTime @default(now())
+  incomingWebhookId String
+
+  // Relations
+  incomingWebhook IncomingWebhook @relation(fields: [incomingWebhookId], references: [id], onDelete: Cascade)
+  deliveryLogs    DeliveryLog[]
+
+  @@map("payload_logs")
+}
+
+enum DeliveryStatus {
+  PENDING
+  SUCCESS
+  FAILED
+  RETRYING
+}
+
+model DeliveryLog {
+  id            String         @id @default(cuid())
+  status        DeliveryStatus @default(PENDING)
+  response      String?
+  error         String?
+  deliveredAt   DateTime?
+  createdAt     DateTime       @default(now())
+  payloadLogId  String
+  endpointId    String
+
+  // Relations
+  payloadLog PayloadLog       @relation(fields: [payloadLogId], references: [id], onDelete: Cascade)
+  endpoint   OutgoingEndpoint @relation(fields: [endpointId], references: [id], onDelete: Cascade)
+
+  @@map("delivery_logs")
+}
+
+
+
+model SupportPlatform {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("support_platforms")
+}
+
+model MeetingReport {
+  id           String         @id @default(cuid())
+  title        String
+  startTime    DateTime
+  endTime      DateTime?
+  outcome      MeetingOutcome
+  notes        String?
+  attendees    String[]       // Array of attendee names/emails
+  actionItems  String[]       // Array of action items
+  customerName String?        // Customer name from webhook
+  customerEmail String?       // Customer email from webhook
+  hostId       String?        // Original host_id from webhook payload
+  isAssigned   Boolean        @default(true) // Track if meeting is assigned to a user
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+  userId       String?        // Nullable for unassigned meetings
+
+  // Relations
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@map("meeting_reports")
+}
+
+model DailyReport {
+  id               String   @id @default(cuid())
+  date             DateTime @db.Date
+  ticketsResolved  Int      @default(0)
+  chatsHandled     Int      @default(0)
+  githubIssues     Int      @default(0)
+  emailsProcessed  Int      @default(0)
+  callsAttended    Int      @default(0)
+  platformReports  Json?    // Array of platform-specific reports
+  notes            String?
+  links            String[] // Array of relevant links
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  userId           String
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, date])
+  @@map("daily_reports")
+}

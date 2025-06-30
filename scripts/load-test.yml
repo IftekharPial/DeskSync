@@ -1,0 +1,176 @@
+config:
+  target: 'http://localhost:3001'
+  phases:
+    - duration: 60
+      arrivalRate: 5
+      name: "Warm up"
+    - duration: 120
+      arrivalRate: 10
+      name: "Ramp up load"
+    - duration: 300
+      arrivalRate: 15
+      name: "Sustained load"
+  variables:
+    testUser:
+      - "test@example.com"
+      - "user1@example.com"
+      - "user2@example.com"
+    testPassword:
+      - "password123"
+
+scenarios:
+  - name: "Health Check"
+    weight: 10
+    flow:
+      - get:
+          url: "/api/health"
+          expect:
+            - statusCode: 200
+
+  - name: "Authentication Flow"
+    weight: 20
+    flow:
+      - post:
+          url: "/api/auth/login"
+          json:
+            email: "{{ testUser }}"
+            password: "{{ testPassword }}"
+          capture:
+            - json: "$.data.token"
+              as: "authToken"
+          expect:
+            - statusCode: 200
+            - hasProperty: "data.token"
+
+  - name: "Daily Reports CRUD"
+    weight: 30
+    flow:
+      # Login first
+      - post:
+          url: "/api/auth/login"
+          json:
+            email: "test@example.com"
+            password: "password123"
+          capture:
+            - json: "$.data.token"
+              as: "authToken"
+      
+      # Get daily reports
+      - get:
+          url: "/api/daily-reports"
+          headers:
+            Authorization: "Bearer {{ authToken }}"
+          expect:
+            - statusCode: 200
+      
+      # Create daily report
+      - post:
+          url: "/api/daily-reports"
+          headers:
+            Authorization: "Bearer {{ authToken }}"
+          json:
+            date: "{{ $randomDate }}"
+            ticketsResolved: "{{ $randomInt(1, 20) }}"
+            chatsHandled: "{{ $randomInt(5, 50) }}"
+            githubIssues: "{{ $randomInt(0, 10) }}"
+            emailsProcessed: "{{ $randomInt(10, 100) }}"
+            callsAttended: "{{ $randomInt(0, 8) }}"
+            notes: "Load test report {{ $randomString() }}"
+          expect:
+            - statusCode: [201, 409]  # 409 for duplicate dates is acceptable
+
+  - name: "Meeting Reports"
+    weight: 20
+    flow:
+      # Login first
+      - post:
+          url: "/api/auth/login"
+          json:
+            email: "test@example.com"
+            password: "password123"
+          capture:
+            - json: "$.data.token"
+              as: "authToken"
+      
+      # Get meeting reports
+      - get:
+          url: "/api/meeting-reports"
+          headers:
+            Authorization: "Bearer {{ authToken }}"
+          expect:
+            - statusCode: 200
+      
+      # Create meeting report
+      - post:
+          url: "/api/meeting-reports"
+          headers:
+            Authorization: "Bearer {{ authToken }}"
+          json:
+            title: "Load Test Meeting {{ $randomString() }}"
+            startTime: "{{ $randomDate }}"
+            outcome: "SUCCESSFUL"
+            notes: "Load test meeting notes"
+            attendees: ["test1@example.com", "test2@example.com"]
+            actionItems: ["Test action item"]
+          expect:
+            - statusCode: 201
+
+  - name: "Analytics"
+    weight: 15
+    flow:
+      # Login first
+      - post:
+          url: "/api/auth/login"
+          json:
+            email: "test@example.com"
+            password: "password123"
+          capture:
+            - json: "$.data.token"
+              as: "authToken"
+      
+      # Get user analytics
+      - get:
+          url: "/api/analytics/user-performance?days=30"
+          headers:
+            Authorization: "Bearer {{ authToken }}"
+          expect:
+            - statusCode: 200
+
+  - name: "Webhook Processing"
+    weight: 5
+    flow:
+      # Test webhook endpoint (if available)
+      - post:
+          url: "/webhook/test-webhook-id"
+          headers:
+            X-Webhook-Secret: "test-secret"
+          json:
+            type: "daily_report_created"
+            data:
+              userId: "test-user-id"
+              date: "{{ $randomDate }}"
+              ticketsResolved: "{{ $randomInt(1, 20) }}"
+            timestamp: "{{ $timestamp }}"
+          expect:
+            - statusCode: [200, 404]  # 404 if webhook doesn't exist is acceptable
+
+# Custom functions for load testing
+functions:
+  randomDate:
+    - "2024-01-{{ $randomInt(1, 28) }}"
+  randomString:
+    - "{{ $randomString(8) }}"
+  timestamp:
+    - "{{ new Date().toISOString() }}"
+
+# Performance thresholds
+expect:
+  thresholds:
+    http.response_time:
+      p95: 1000  # 95% of requests should complete within 1 second
+      p99: 2000  # 99% of requests should complete within 2 seconds
+    http.request_rate: 10  # At least 10 requests per second
+    http.codes.200: 0.8   # At least 80% success rate
+    http.codes.201: 0.1   # Some creation requests
+    http.codes.4xx: 0.1   # Less than 10% client errors
+    http.codes.5xx: 0.01  # Less than 1% server errors
