@@ -101,7 +101,7 @@ export class WebhookDeliveryService {
         attemptNumber: job.attemptsMade + 1,
       });
 
-      logWebhookDelivery(endpointId, endpointId, isSuccess, duration);
+      logWebhookDelivery(endpoint.incomingWebhookId, endpointId, isSuccess, duration);
 
       if (!isSuccess) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -129,7 +129,7 @@ export class WebhookDeliveryService {
         attemptNumber: job.attemptsMade + 1,
       });
 
-      logWebhookDelivery(endpointId, endpointId, false, duration, errorMessage);
+      logWebhookDelivery(endpoint.incomingWebhookId, endpointId, false, duration, errorMessage);
 
       throw error;
     }
