@@ -92,7 +92,7 @@ export default function DashboardPage() {
         {onboardingChecks.shouldShowWelcomeBanner && (
           <WelcomeBanner
             userRole={isAdmin ? 'ADMIN' : 'USER'}
-            userName={session?.user?.name}
+            userName={session?.user?.name || undefined}
             onDismiss={onboardingActions.dismissWelcomeBanner}
             onStartTour={onboardingActions.startOnboardingWizard}
           />
