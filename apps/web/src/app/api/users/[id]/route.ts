@@ -65,7 +65,7 @@ export async function GET(
           select: {
             dailyReports: true,
             meetingReports: true,
-            webhooks: true,
+            createdWebhooks: true,
           }
         }
       }
