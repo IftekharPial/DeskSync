@@ -87,9 +87,9 @@ export default function UsersPage() {
     () => usersApi.getAll({ page: currentPage, limit: 10 }),
     {
       select: (response) => {
-        // The API returns { success: true, data: { users: [...], pagination: {...} } }
-        // Axios wraps this in response.data, so we need response.data.data
-        return response.data.data
+        // The API returns { success: true, data: [...], pagination: {...} }
+        // Axios wraps this in response.data, so we need response.data
+        return response.data
       },
       keepPreviousData: true,
     }
@@ -261,7 +261,7 @@ export default function UsersPage() {
   }
 
   // Ensure users is always an array to prevent .filter() errors
-  const users = Array.isArray(usersData?.users) ? usersData.users : []
+  const users = Array.isArray(usersData?.data) ? usersData.data : []
   const pagination = usersData?.pagination
 
   return (
