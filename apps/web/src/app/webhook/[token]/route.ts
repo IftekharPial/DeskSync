@@ -77,6 +77,8 @@ export async function POST(
   request: NextRequest,
   { params }: { params: { token: string } }
 ) {
+  let payloadLogId: string | undefined;
+
   try {
     const { token } = params;
 
@@ -202,7 +204,7 @@ export async function POST(
     }
 
     // Enhanced logging with the new webhook logger
-    const payloadLogId = await WebhookLogger.logIncomingPayload({
+    payloadLogId = await WebhookLogger.logIncomingPayload({
       webhookId: webhook.id,
       payload: payload as any,
       headers: Object.fromEntries(request.headers.entries()),
