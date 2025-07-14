@@ -13,7 +13,7 @@ import { Badge } from '@/components/ui/badge'
 import { LoadingSpinner } from '@/components/ui/loading-spinner'
 import { useToast } from '@/components/ui/use-toast'
 import { endpointsApi, webhooksApi } from '@/lib/api'
-import { 
+import {
   ArrowLeft,
   Plus,
   MoreHorizontal,
@@ -23,7 +23,8 @@ import {
   Globe,
   Settings,
   CheckCircle,
-  XCircle
+  XCircle,
+  Loader2
 } from 'lucide-react'
 import {
   DropdownMenu,
@@ -60,6 +61,7 @@ export default function WebhookEndpointsPage() {
 
   const [showForm, setShowForm] = useState(false)
   const [selectedEndpoint, setSelectedEndpoint] = useState<any>(null)
+  const [testingEndpointId, setTestingEndpointId] = useState<string | null>(null)
   const [endpointForm, setEndpointForm] = useState({
     name: '',
     url: '',
@@ -168,18 +170,30 @@ export default function WebhookEndpointsPage() {
   const testEndpointMutation = useMutation(
     (endpointId: string) => endpointsApi.test(endpointId, { test: 'payload' }),
     {
-      onSuccess: () => {
-        toast({
-          title: 'Test successful',
-          description: 'Endpoint test completed successfully.',
-        })
+      onSuccess: (response) => {
+        const result = response.data.data
+        if (result?.success) {
+          toast({
+            title: '✅ Test Successful',
+            description: `Endpoint "${result.endpoint?.name}" responded with ${result.statusCode} in ${result.duration}ms`,
+          })
+        } else {
+          toast({
+            title: '⚠️ Test Completed with Issues',
+            description: `Endpoint returned ${result?.statusCode}: ${result?.statusText || 'Unknown error'}`,
+            variant: 'destructive',
+          })
+        }
+        setTestingEndpointId(null)
       },
-      onError: () => {
+      onError: (error: any) => {
+        const errorMessage = error.response?.data?.error || error.message || 'Unknown error'
         toast({
-          title: 'Test failed',
-          description: 'Endpoint test failed. Check your configuration.',
+          title: '❌ Test Failed',
+          description: `Endpoint test failed: ${errorMessage}`,
           variant: 'destructive',
         })
+        setTestingEndpointId(null)
       },
     }
   )
@@ -219,6 +233,7 @@ export default function WebhookEndpointsPage() {
   }
 
   const handleTest = (endpointId: string) => {
+    setTestingEndpointId(endpointId)
     testEndpointMutation.mutate(endpointId)
   }
 
@@ -387,9 +402,16 @@ export default function WebhookEndpointsPage() {
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => handleTest(endpoint.id)}>
-                              <TestTube className="mr-2 h-4 w-4" />
-                              Test
+                            <DropdownMenuItem
+                              onClick={() => handleTest(endpoint.id)}
+                              disabled={testingEndpointId === endpoint.id}
+                            >
+                              {testingEndpointId === endpoint.id ? (
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                              ) : (
+                                <TestTube className="mr-2 h-4 w-4" />
+                              )}
+                              {testingEndpointId === endpoint.id ? 'Testing...' : 'Test'}
                             </DropdownMenuItem>
                             <DropdownMenuItem onClick={() => handleEdit(endpoint)}>
                               <Edit className="mr-2 h-4 w-4" />
