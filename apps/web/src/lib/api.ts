@@ -163,8 +163,10 @@ export const endpointsApi = {
   getLogs: (id: string, params?: { page?: number; limit?: number }) =>
     apiClient.get<PaginatedResponse<any>>(`/endpoints/${id}/logs`, { params }),
   
-  test: (id: string, payload?: any) =>
-    apiClient.post<ApiResponse<any>>(`/endpoints/${id}/test`, { payload }),
+  test: (id: string, payload?: any) => {
+    console.log('🧪 [FRONTEND] Testing endpoint:', id, 'with payload:', payload)
+    return apiClient.post<ApiResponse<any>>(`/endpoints/${id}/test`, payload || {})
+  },
 }
 
 // Daily Reports API

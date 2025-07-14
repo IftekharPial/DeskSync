@@ -168,16 +168,22 @@ export default function WebhookEndpointsPage() {
 
   // Test endpoint mutation
   const testEndpointMutation = useMutation(
-    (endpointId: string) => endpointsApi.test(endpointId, { test: 'payload' }),
+    (endpointId: string) => {
+      console.log('🧪 [UI] Starting endpoint test for:', endpointId)
+      return endpointsApi.test(endpointId, { test: 'payload' })
+    },
     {
       onSuccess: (response) => {
+        console.log('✅ [UI] Test mutation success:', response)
         const result = response.data.data
         if (result?.success) {
+          console.log('✅ [UI] Endpoint test successful:', result)
           toast({
             title: '✅ Test Successful',
             description: `Endpoint "${result.endpoint?.name}" responded with ${result.statusCode} in ${result.duration}ms`,
           })
         } else {
+          console.log('⚠️ [UI] Endpoint test completed with issues:', result)
           toast({
             title: '⚠️ Test Completed with Issues',
             description: `Endpoint returned ${result?.statusCode}: ${result?.statusText || 'Unknown error'}`,
@@ -187,6 +193,8 @@ export default function WebhookEndpointsPage() {
         setTestingEndpointId(null)
       },
       onError: (error: any) => {
+        console.error('❌ [UI] Test mutation error:', error)
+        console.error('❌ [UI] Error response:', error.response)
         const errorMessage = error.response?.data?.error || error.message || 'Unknown error'
         toast({
           title: '❌ Test Failed',
