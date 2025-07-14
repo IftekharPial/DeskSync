@@ -112,7 +112,7 @@ export async function POST(
     }
 
     // For Slack endpoints, ensure proper formatting
-    let requestPayload = processedPayload
+    let requestPayload: any = processedPayload
     if (endpoint.url.includes('hooks.slack.com')) {
       // Create Slack-compatible test message
       requestPayload = {

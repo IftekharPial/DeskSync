@@ -217,7 +217,9 @@ export async function POST(
     });
 
     // Mark as processing
-    await WebhookLogger.markAsProcessing(payloadLogId);
+    if (payloadLogId) {
+      await WebhookLogger.markAsProcessing(payloadLogId);
+    }
 
     // Create meeting report from processed payload
     const meetingReport = await prisma.meetingReport.create({
@@ -265,6 +267,7 @@ export async function POST(
         if (endpoint.url.includes('hooks.slack.com') && !processedMessage) {
           // If no template was processed, create a basic Slack-compatible message
           if (isBookingPayload) {
+            const bookingPayload = payload as BookingWebhookPayload;
             requestPayload = {
               text: `📅 New Booking Created`,
               attachments: [
@@ -274,22 +277,22 @@ export async function POST(
                   fields: [
                     {
                       title: 'Name',
-                      value: `${payload.first_name} ${payload.last_name}`,
+                      value: `${bookingPayload.booking.first_name} ${bookingPayload.booking.last_name}`,
                       short: true
                     },
                     {
                       title: 'Email',
-                      value: payload.email,
+                      value: bookingPayload.booking.email,
                       short: true
                     },
                     {
                       title: 'Start Time',
-                      value: new Date(payload.start_time).toLocaleString(),
+                      value: new Date(bookingPayload.booking.start_time).toLocaleString(),
                       short: true
                     },
                     {
                       title: 'End Time',
-                      value: new Date(payload.end_time).toLocaleString(),
+                      value: new Date(bookingPayload.booking.end_time).toLocaleString(),
                       short: true
                     }
                   ],
@@ -354,29 +357,33 @@ export async function POST(
         }
 
         // Log successful delivery
-        await prisma.deliveryLog.create({
-          data: {
-            endpointId: endpoint.id,
-            payloadLogId: payloadLogId,
-            status: 'SUCCESS',
-            deliveredAt: new Date(),
-            response: 'Notification sent successfully'
-          }
-        });
+        if (payloadLogId) {
+          await prisma.deliveryLog.create({
+            data: {
+              endpointId: endpoint.id,
+              payloadLogId: payloadLogId,
+              status: 'SUCCESS',
+              deliveredAt: new Date(),
+              response: 'Notification sent successfully'
+            }
+          });
+        }
 
         return { success: true, endpointId: endpoint.id };
       } catch (error) {
         console.error(`Failed to deliver to endpoint ${endpoint.id}:`, error);
         
         // Log failed delivery
-        await prisma.deliveryLog.create({
-          data: {
-            endpointId: endpoint.id,
-            payloadLogId: payloadLogId,
-            status: 'FAILED',
-            error: error instanceof Error ? error.message : 'Unknown error'
-          }
-        });
+        if (payloadLogId) {
+          await prisma.deliveryLog.create({
+            data: {
+              endpointId: endpoint.id,
+              payloadLogId: payloadLogId,
+              status: 'FAILED',
+              error: error instanceof Error ? error.message : 'Unknown error'
+            }
+          });
+        }
 
         return { success: false, endpointId: endpoint.id, error: error instanceof Error ? error.message : 'Unknown error' };
       }
@@ -387,7 +394,9 @@ export async function POST(
     const failureCount = deliveryResults.filter(r => !r.success).length;
 
     // Mark payload as processed successfully
-    await WebhookLogger.markAsProcessed(payloadLogId, 200);
+    if (payloadLogId) {
+      await WebhookLogger.markAsProcessed(payloadLogId, 200);
+    }
 
     const response = NextResponse.json({
       success: true,
