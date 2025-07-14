@@ -38,37 +38,30 @@ export default function LoginPage() {
 
     try {
       console.log('🔑 Attempting login for:', data.email)
+
+      // Let NextAuth handle the entire flow including CSRF and redirects
       const result = await signIn('credentials', {
         email: data.email,
         password: data.password,
-        redirect: false,
         callbackUrl: '/dashboard',
+        // Remove redirect: false to let NextAuth handle redirects
       })
 
       console.log('🔍 SignIn result:', result)
 
+      // NextAuth will handle the redirect automatically if successful
+      // We only need to handle errors here
       if (result?.error) {
+        console.log('❌ Login failed:', result.error)
         toast({
           title: 'Login Failed',
           description: 'Invalid email or password. Please try again.',
           variant: 'destructive',
         })
       } else {
-        toast({
-          title: 'Login Successful',
-          description: 'Welcome back to DailySync!',
-        })
-
-        // Force a small delay to ensure session is established
-        await new Promise(resolve => setTimeout(resolve, 100))
-
-        // Redirect to dashboard
-        router.push('/dashboard')
-
-        // Force a page refresh to ensure session is loaded
-        setTimeout(() => {
-          window.location.href = '/dashboard'
-        }, 200)
+        console.log('✅ Login initiated, NextAuth will handle redirect automatically')
+        // NextAuth will redirect to callbackUrl automatically
+        // No manual redirect needed
       }
     } catch (error) {
       toast({

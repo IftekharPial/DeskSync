@@ -1,7 +1,16 @@
 import { NextAuthOptions, User } from 'next-auth'
 import CredentialsProvider from 'next-auth/providers/credentials'
 
+// Debug environment variables at module load
+console.log('🔍 NextAuth config loading:', {
+  NEXTAUTH_SECRET: !!process.env.NEXTAUTH_SECRET,
+  NEXTAUTH_URL: process.env.NEXTAUTH_URL,
+  secretValue: process.env.NEXTAUTH_SECRET?.substring(0, 10) + '...',
+  NODE_ENV: process.env.NODE_ENV
+})
+
 export const authOptions: NextAuthOptions = {
+  secret: process.env.NEXTAUTH_SECRET,
   providers: [
     CredentialsProvider({
       name: 'credentials',
@@ -11,6 +20,11 @@ export const authOptions: NextAuthOptions = {
       },
       async authorize(credentials, req): Promise<User | null> {
         console.log('🔍 NextAuth authorize called with:', { email: credentials?.email, hasPassword: !!credentials?.password })
+        console.log('🔍 Environment check in authorize:', {
+          NEXTAUTH_SECRET: !!process.env.NEXTAUTH_SECRET,
+          NEXTAUTH_URL: process.env.NEXTAUTH_URL,
+          secretLength: process.env.NEXTAUTH_SECRET?.length
+        })
 
         if (!credentials?.email || !credentials?.password) {
           console.log('❌ Missing credentials')
@@ -27,16 +41,19 @@ export const authOptions: NextAuthOptions = {
 
         if (user) {
           console.log('✅ User authenticated:', user.email, user.role)
-          return {
+          const userObject = {
             id: user.id,
             email: user.email,
             name: user.name,
             role: user.role,
             isActive: true,
           } as User
+          console.log('✅ Returning user object:', userObject)
+          return userObject
         }
 
         console.log('❌ Invalid credentials for:', credentials.email)
+        console.log('❌ Returning null from authorize')
         return null
       },
     }),
@@ -48,48 +65,15 @@ export const authOptions: NextAuthOptions = {
   },
   jwt: {
     maxAge: 30 * 24 * 60 * 60, // 30 days
-    secret: process.env.JWT_SECRET || process.env.NEXTAUTH_SECRET,
+    // Remove duplicate secret - use the main secret from authOptions
   },
-  cookies: {
-    sessionToken: {
-      name: process.env.NODE_ENV === 'production' ? '__Secure-next-auth.session-token' : 'next-auth.session-token',
-      options: {
-        httpOnly: true,
-        sameSite: 'lax',
-        path: '/',
-        secure: process.env.NODE_ENV === 'production',
-        domain: process.env.NODE_ENV === 'production' ? process.env.NEXTAUTH_URL?.replace(/https?:\/\//, '') : undefined,
-        maxAge: 30 * 24 * 60 * 60, // 30 days
-      },
-    },
-    callbackUrl: {
-      name: process.env.NODE_ENV === 'production' ? '__Secure-next-auth.callback-url' : 'next-auth.callback-url',
-      options: {
-        httpOnly: true,
-        sameSite: 'lax',
-        path: '/',
-        secure: process.env.NODE_ENV === 'production',
-        domain: process.env.NODE_ENV === 'production' ? process.env.NEXTAUTH_URL?.replace(/https?:\/\//, '') : undefined,
-      },
-    },
-    csrfToken: {
-      name: process.env.NODE_ENV === 'production' ? '__Host-next-auth.csrf-token' : 'next-auth.csrf-token',
-      options: {
-        httpOnly: true,
-        sameSite: 'lax',
-        path: '/',
-        secure: process.env.NODE_ENV === 'production',
-      },
-    },
-  },
+  // Remove custom cookie configuration - let NextAuth use defaults
+  // This might be causing CSRF validation issues
   pages: {
     signIn: '/login',
     error: '/login',
   },
-  secret: process.env.NEXTAUTH_SECRET,
-  useSecureCookies: false, // Disable secure cookies for localhost
   debug: process.env.NODE_ENV === 'development',
-  trustHost: true, // Trust the host for localhost development
   callbacks: {
     async jwt({ token, user, account }) {
       console.log('🔍 JWT callback called:', { hasUser: !!user, tokenId: token.id, userEmail: user?.email, account: account?.type })
@@ -126,6 +110,27 @@ export const authOptions: NextAuthOptions = {
         })
       }
       return session
+    },
+    async redirect({ url, baseUrl }) {
+      console.log('🔄 NextAuth redirect callback:', { url, baseUrl })
+
+      // If the URL is relative, make it absolute
+      if (url.startsWith('/')) {
+        const redirectUrl = `${baseUrl}${url}`
+        console.log('✅ Redirecting to:', redirectUrl)
+        return redirectUrl
+      }
+
+      // If the URL is on the same origin, allow it
+      if (url.startsWith(baseUrl)) {
+        console.log('✅ Same origin redirect to:', url)
+        return url
+      }
+
+      // Default to dashboard for successful logins
+      const defaultUrl = `${baseUrl}/dashboard`
+      console.log('✅ Default redirect to dashboard:', defaultUrl)
+      return defaultUrl
     },
   },
   events: {
