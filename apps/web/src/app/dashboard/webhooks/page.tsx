@@ -33,11 +33,11 @@ export default function WebhooksPage() {
     () => webhooksApi.getAll({ page: 1, limit: 5 }),
     {
       select: (response) => {
-        // The webhooks API returns { success: true, data: [...], pagination: {...} }
-        // Axios wraps this in response.data, so we access response.data directly
+        // The webhooks API returns { success: true, data: { users: [...], pagination: {...} } }
+        // Axios wraps this in response.data, so we access response.data.data
         return {
-          webhooks: response.data.data || [],
-          pagination: response.data.pagination || null
+          webhooks: response.data.data?.users || response.data.data || [],
+          pagination: response.data.data?.pagination || null
         }
       },
     }
