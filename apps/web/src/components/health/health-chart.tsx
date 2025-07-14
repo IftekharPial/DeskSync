@@ -103,19 +103,19 @@ export function HealthChart({ data }: HealthChartProps) {
       <div className="grid grid-cols-3 gap-4 pt-4 border-t">
         <div className="text-center">
           <div className="text-lg font-bold text-green-600">
-            {(healthData.reduce((sum, item) => sum + item.successRate, 0) / healthData.length).toFixed(1)}%
+            {(healthData.reduce((sum: number, item: any) => sum + item.successRate, 0) / healthData.length).toFixed(1)}%
           </div>
           <div className="text-xs text-muted-foreground">Avg Success Rate</div>
         </div>
         <div className="text-center">
           <div className="text-lg font-bold text-blue-600">
-            {Math.round(healthData.reduce((sum, item) => sum + item.responseTime, 0) / healthData.length)}ms
+            {Math.round(healthData.reduce((sum: number, item: any) => sum + item.responseTime, 0) / healthData.length)}ms
           </div>
           <div className="text-xs text-muted-foreground">Avg Response Time</div>
         </div>
         <div className="text-center">
           <div className="text-lg font-bold text-purple-600">
-            {healthData.reduce((sum, item) => sum + item.deliveries, 0)}
+            {healthData.reduce((sum: number, item: any) => sum + item.deliveries, 0)}
           </div>
           <div className="text-xs text-muted-foreground">Total Deliveries</div>
         </div>
