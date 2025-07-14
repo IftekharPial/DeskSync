@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@dailysync/database';
-import { sendSlackNotification, sendBookingSlackNotification } from '@/lib/slack';
+// Removed hardcoded Slack imports - now using configured endpoint URLs
 import { WebhookLogger } from '@/lib/webhook-logger';
 import { TemplateProcessor } from '@/lib/template-processor';
 
@@ -258,22 +258,20 @@ export async function POST(
           }
         }
 
-        // For Slack endpoints, use the enhanced Slack notification function
-        if (endpoint.name.toLowerCase().includes('slack')) {
-          if (isBookingPayload) {
-            // Use booking-specific notification with processed template
-            await sendBookingSlackNotification(payload as BookingWebhookPayload, processedMessage);
-          } else {
-            // Use legacy meeting notification
-            await sendSlackNotification({
-              title: processedPayload.title,
-              startTime: processedPayload.start_time,
-              endTime: processedPayload.end_time,
-              participants: processedPayload.participants,
-              summary: processedPayload.summary,
-              meetingId: processedPayload.meeting_id
-            });
-          }
+        // Send to the configured endpoint URL (works for any endpoint including Slack)
+        const requestPayload = processedMessage || processedPayload;
+
+        const response = await fetch(endpoint.url, {
+          method: endpoint.method,
+          headers: {
+            'Content-Type': 'application/json',
+            ...(endpoint.headers as Record<string, string> || {}),
+          },
+          body: JSON.stringify(requestPayload),
+        });
+
+        if (!response.ok) {
+          throw new Error(`Endpoint ${endpoint.name} returned status ${response.status}: ${response.statusText}`);
         }
 
         // Log successful delivery
