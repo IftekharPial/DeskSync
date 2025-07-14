@@ -259,7 +259,80 @@ export async function POST(
         }
 
         // Send to the configured endpoint URL (works for any endpoint including Slack)
-        const requestPayload = processedMessage || processedPayload;
+        let requestPayload = processedMessage || processedPayload;
+
+        // For Slack endpoints, ensure the payload has the correct format
+        if (endpoint.url.includes('hooks.slack.com') && !processedMessage) {
+          // If no template was processed, create a basic Slack-compatible message
+          if (isBookingPayload) {
+            requestPayload = {
+              text: `📅 New Booking Created`,
+              attachments: [
+                {
+                  color: 'good',
+                  title: 'Booking Details',
+                  fields: [
+                    {
+                      title: 'Name',
+                      value: `${payload.first_name} ${payload.last_name}`,
+                      short: true
+                    },
+                    {
+                      title: 'Email',
+                      value: payload.email,
+                      short: true
+                    },
+                    {
+                      title: 'Start Time',
+                      value: new Date(payload.start_time).toLocaleString(),
+                      short: true
+                    },
+                    {
+                      title: 'End Time',
+                      value: new Date(payload.end_time).toLocaleString(),
+                      short: true
+                    }
+                  ],
+                  footer: 'DailySync Booking System',
+                  ts: Math.floor(Date.now() / 1000)
+                }
+              ]
+            };
+          } else {
+            // Meeting payload
+            requestPayload = {
+              text: `📅 New Meeting Report`,
+              attachments: [
+                {
+                  color: 'good',
+                  title: processedPayload.title || 'Meeting Report',
+                  fields: [
+                    {
+                      title: 'Start Time',
+                      value: new Date(processedPayload.start_time).toLocaleString(),
+                      short: true
+                    },
+                    {
+                      title: 'End Time',
+                      value: new Date(processedPayload.end_time).toLocaleString(),
+                      short: true
+                    },
+                    {
+                      title: 'Participants',
+                      value: processedPayload.participants?.length || 0,
+                      short: true
+                    }
+                  ],
+                  footer: 'DailySync Meeting System',
+                  ts: Math.floor(Date.now() / 1000)
+                }
+              ]
+            };
+          }
+        }
+
+        // Log the payload being sent for debugging
+        console.log(`Sending to ${endpoint.name} (${endpoint.url}):`, JSON.stringify(requestPayload, null, 2));
 
         const response = await fetch(endpoint.url, {
           method: endpoint.method,
@@ -271,7 +344,13 @@ export async function POST(
         });
 
         if (!response.ok) {
-          throw new Error(`Endpoint ${endpoint.name} returned status ${response.status}: ${response.statusText}`);
+          const errorText = await response.text();
+          console.error(`Endpoint ${endpoint.name} error:`, {
+            status: response.status,
+            statusText: response.statusText,
+            body: errorText
+          });
+          throw new Error(`Endpoint ${endpoint.name} returned status ${response.status}: ${response.statusText} - ${errorText}`);
         }
 
         // Log successful delivery
