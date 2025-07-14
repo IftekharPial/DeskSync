@@ -29,7 +29,14 @@ export default function MeetingReportsPage() {
     'recent-meetings',
     () => meetingReportsApi.getAll({ page: 1, limit: 5 }),
     {
-      select: (response) => response.data.data,
+      select: (response) => {
+        // Handle both possible response structures
+        if (response.data.data && Array.isArray(response.data.data)) {
+          return response.data.data;
+        }
+        // Fallback for different response structure
+        return Array.isArray(response.data) ? response.data : [];
+      },
     }
   )
 
@@ -78,7 +85,7 @@ export default function MeetingReportsPage() {
         <CardContent>
           {loadingRecent ? (
             <LoadingSpinner text="Loading recent meetings..." />
-          ) : recentMeetings && recentMeetings.length > 0 ? (
+          ) : recentMeetings && Array.isArray(recentMeetings) && recentMeetings.length > 0 ? (
             <div className="space-y-4">
               {recentMeetings.slice(0, 3).map((meeting: any) => (
                 <div
