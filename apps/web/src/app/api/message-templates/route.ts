@@ -65,7 +65,7 @@ export async function GET(request: NextRequest) {
     const isAdmin = (session as any)?.user?.role === 'ADMIN'
     if (!isAdmin) {
       where.incomingWebhook = {
-        userId: (session as any).user.id
+        createdBy: (session as any).user.id
       }
     }
 
@@ -166,7 +166,7 @@ export async function POST(request: NextRequest) {
     }
 
     const isAdmin = (session as any)?.user?.role === 'ADMIN'
-    if (!isAdmin && webhook.userId !== (session as any).user.id) {
+    if (!isAdmin && webhook.createdBy !== (session as any).user.id) {
       return NextResponse.json(
         { success: false, error: 'Forbidden - Access denied' },
         { status: 403, headers: corsHeaders }

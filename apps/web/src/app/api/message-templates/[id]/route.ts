@@ -48,7 +48,7 @@ export async function GET(
             id: true,
             name: true,
             url: true,
-            userId: true,
+            createdBy: true,
           }
         }
       }
@@ -63,7 +63,7 @@ export async function GET(
 
     // Check access permissions
     const isAdmin = (session as any)?.user?.role === 'ADMIN'
-    if (!isAdmin && messageTemplate.incomingWebhook.userId !== (session as any).user.id) {
+    if (!isAdmin && messageTemplate.incomingWebhook.createdBy !== (session as any).user.id) {
       return NextResponse.json(
         { success: false, error: 'Forbidden - Access denied' },
         { status: 403, headers: corsHeaders }
@@ -121,7 +121,7 @@ export async function PUT(
       include: {
         incomingWebhook: {
           select: {
-            userId: true,
+            createdBy: true,
           }
         }
       }
@@ -135,7 +135,7 @@ export async function PUT(
     }
 
     const isAdmin = (session as any)?.user?.role === 'ADMIN'
-    if (!isAdmin && existingTemplate.incomingWebhook.userId !== (session as any).user.id) {
+    if (!isAdmin && existingTemplate.incomingWebhook.createdBy !== (session as any).user.id) {
       return NextResponse.json(
         { success: false, error: 'Forbidden - Access denied' },
         { status: 403, headers: corsHeaders }
@@ -195,7 +195,7 @@ export async function DELETE(
       include: {
         incomingWebhook: {
           select: {
-            userId: true,
+            createdBy: true,
           }
         }
       }
@@ -209,7 +209,7 @@ export async function DELETE(
     }
 
     const isAdmin = (session as any)?.user?.role === 'ADMIN'
-    if (!isAdmin && existingTemplate.incomingWebhook.userId !== (session as any).user.id) {
+    if (!isAdmin && existingTemplate.incomingWebhook.createdBy !== (session as any).user.id) {
       return NextResponse.json(
         { success: false, error: 'Forbidden - Access denied' },
         { status: 403, headers: corsHeaders }
