@@ -29,7 +29,14 @@ export default function MeetingReportsPage() {
     'recent-meetings',
     () => meetingReportsApi.getAll({ page: 1, limit: 5 }),
     {
-      select: (response) => response.data.data,
+      select: (response) => {
+        // Handle both possible response structures
+        if (response.data.data && Array.isArray(response.data.data)) {
+          return response.data.data;
+        }
+        // Fallback for different response structure
+        return Array.isArray(response.data) ? response.data : [];
+      },
     }
   )
 
@@ -87,7 +94,7 @@ export default function MeetingReportsPage() {
               <LoadingSpinner text="Loading meetings..." />
             ) : (
               <div className="space-y-3">
-                {recentMeetings && recentMeetings.length > 0 ? (
+                {recentMeetings && Array.isArray(recentMeetings) && recentMeetings.length > 0 ? (
                   recentMeetings
                     .filter((meeting: any) => {
                       const today = new Date().toDateString()
