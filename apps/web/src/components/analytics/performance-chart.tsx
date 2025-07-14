@@ -15,6 +15,7 @@ import {
   Bar,
   Legend,
 } from 'recharts'
+import { EmptyAnalytics } from '@/components/ui/empty-state'
 
 interface PerformanceChartProps {
   data: {
@@ -42,16 +43,7 @@ export function PerformanceChart({ data, isAdmin }: PerformanceChartProps) {
   }, [data])
 
   if (!chartData || chartData.length === 0) {
-    return (
-      <div className="flex items-center justify-center h-64 text-muted-foreground">
-        <div className="text-center">
-          <p className="text-sm">No data available</p>
-          <p className="text-xs mt-1">
-            Performance data will appear here once reports are submitted
-          </p>
-        </div>
-      </div>
-    )
+    return <EmptyAnalytics type="performance" />
   }
 
   if (isAdmin) {

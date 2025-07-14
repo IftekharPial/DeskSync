@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
+import { prisma } from '@dailysync/database'
 
 // Add CORS headers
 const corsHeaders = {
@@ -13,79 +14,164 @@ export async function OPTIONS(request: NextRequest) {
   return new NextResponse(null, { status: 200, headers: corsHeaders })
 }
 
-// Mock leaderboard data
-const generateMockLeaderboard = (metric: string, limit: number) => {
-  const users = [
-    { id: '1', name: 'John Doe', email: 'john.doe@dailysync.com', avatar: null },
-    { id: '2', name: 'Jane Smith', email: 'jane.smith@dailysync.com', avatar: null },
-    { id: '3', name: 'Bob Johnson', email: 'bob.johnson@dailysync.com', avatar: null },
-    { id: '4', name: 'Alice Brown', email: 'alice.brown@dailysync.com', avatar: null },
-    { id: '5', name: 'Charlie Wilson', email: 'charlie.wilson@dailysync.com', avatar: null },
-    { id: '6', name: 'Diana Davis', email: 'diana.davis@dailysync.com', avatar: null },
-    { id: '7', name: 'Eve Miller', email: 'eve.miller@dailysync.com', avatar: null },
-    { id: '8', name: 'Frank Garcia', email: 'frank.garcia@dailysync.com', avatar: null },
-    { id: '9', name: 'Grace Lee', email: 'grace.lee@dailysync.com', avatar: null },
-    { id: '10', name: 'Henry Taylor', email: 'henry.taylor@dailysync.com', avatar: null }
-  ]
+// Generate real leaderboard data from database
+const generateRealLeaderboard = async (metric: string, limit: number, period: string, isAdmin: boolean, userId?: string) => {
+  // Calculate date range based on period
+  const endDate = new Date()
+  const startDate = new Date()
 
-  const leaderboardData = users.slice(0, limit).map((user, index) => {
-    let value: number
-    let change: number
-    let trend: 'up' | 'down' | 'stable'
-
-    switch (metric) {
-      case 'tickets':
-        value = Math.floor(Math.random() * 50) + 20 // 20-70 tickets
-        change = Math.floor(Math.random() * 20) - 10 // -10 to +10
-        break
-      case 'reports':
-        value = Math.floor(Math.random() * 30) + 10 // 10-40 reports
-        change = Math.floor(Math.random() * 10) - 5 // -5 to +5
-        break
-      case 'score':
-        value = parseFloat((Math.random() * 2 + 8).toFixed(1)) // 8.0-10.0 score
-        change = parseFloat((Math.random() * 1 - 0.5).toFixed(1)) // -0.5 to +0.5
-        break
-      case 'completion':
-        value = Math.floor(Math.random() * 20) + 80 // 80-100% completion
-        change = Math.floor(Math.random() * 10) - 5 // -5 to +5
-        break
-      default:
-        value = Math.floor(Math.random() * 100)
-        change = Math.floor(Math.random() * 20) - 10
-    }
-
-    trend = change > 0 ? 'up' : change < 0 ? 'down' : 'stable'
-
-    return {
-      rank: index + 1,
-      user: {
-        id: user.id,
-        name: user.name,
-        email: user.email,
-        avatar: user.avatar
-      },
-      value,
-      change,
-      trend,
-      metric
-    }
-  })
-
-  // Sort by value (descending for most metrics, ascending for some)
-  const sortDescending = ['tickets', 'reports', 'score', 'completion']
-  if (sortDescending.includes(metric)) {
-    leaderboardData.sort((a, b) => b.value - a.value)
-  } else {
-    leaderboardData.sort((a, b) => a.value - b.value)
+  switch (period) {
+    case 'week':
+      startDate.setDate(startDate.getDate() - 7)
+      break
+    case 'month':
+      startDate.setMonth(startDate.getMonth() - 1)
+      break
+    case 'quarter':
+      startDate.setMonth(startDate.getMonth() - 3)
+      break
+    case 'year':
+      startDate.setFullYear(startDate.getFullYear() - 1)
+      break
+    default:
+      startDate.setDate(startDate.getDate() - 7)
   }
 
-  // Update ranks after sorting
-  leaderboardData.forEach((item, index) => {
-    item.rank = index + 1
-  })
+  // Build where clause for user access control
+  const whereClause: any = {
+    isActive: true,
+    role: 'USER' // Only include regular users in leaderboard
+  }
 
-  return leaderboardData
+  let leaderboardData: any[] = []
+
+  switch (metric) {
+    case 'tickets':
+      // Get users with their ticket resolution counts
+      const usersWithTickets = await prisma.user.findMany({
+        where: whereClause,
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          dailyReports: {
+            where: {
+              date: {
+                gte: startDate,
+                lte: endDate
+              }
+            },
+            select: {
+              ticketsResolved: true
+            }
+          }
+        }
+      })
+
+      leaderboardData = usersWithTickets.map(user => {
+        const totalTickets = user.dailyReports.reduce((sum, report) => sum + report.ticketsResolved, 0)
+        return {
+          user: {
+            id: user.id,
+            name: user.name,
+            email: user.email,
+            avatar: null
+          },
+          value: totalTickets,
+          metric: 'tickets'
+        }
+      }).filter(item => item.value > 0)
+      break
+
+    case 'reports':
+      // Get users with their report submission counts
+      const usersWithReports = await prisma.user.findMany({
+        where: whereClause,
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          _count: {
+            select: {
+              dailyReports: {
+                where: {
+                  date: {
+                    gte: startDate,
+                    lte: endDate
+                  }
+                }
+              }
+            }
+          }
+        }
+      })
+
+      leaderboardData = usersWithReports.map(user => ({
+        user: {
+          id: user.id,
+          name: user.name,
+          email: user.email,
+          avatar: null
+        },
+        value: user._count.dailyReports,
+        metric: 'reports'
+      })).filter(item => item.value > 0)
+      break
+
+    case 'meetings':
+      // Get users with their meeting counts
+      const usersWithMeetings = await prisma.user.findMany({
+        where: whereClause,
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          _count: {
+            select: {
+              meetingReports: {
+                where: {
+                  createdAt: {
+                    gte: startDate,
+                    lte: endDate
+                  }
+                }
+              }
+            }
+          }
+        }
+      })
+
+      leaderboardData = usersWithMeetings.map(user => ({
+        user: {
+          id: user.id,
+          name: user.name,
+          email: user.email,
+          avatar: null
+        },
+        value: user._count.meetingReports,
+        metric: 'meetings'
+      })).filter(item => item.value > 0)
+      break
+
+    default:
+      // Default to tickets
+      return generateRealLeaderboard('tickets', limit, period, isAdmin, userId)
+  }
+
+  // Sort by value (descending)
+  leaderboardData.sort((a, b) => b.value - a.value)
+
+  // Add ranks and limit results
+  const rankedData = leaderboardData.slice(0, limit).map((item, index) => ({
+    rank: index + 1,
+    user: item.user,
+    value: item.value,
+    change: 0, // TODO: Calculate change from previous period
+    trend: 'stable' as const,
+    metric: item.metric
+  }))
+
+  return rankedData
 }
 
 export async function GET(request: NextRequest) {
@@ -100,6 +186,7 @@ export async function GET(request: NextRequest) {
       )
     }
 
+    const userId = (session as any)?.user?.id
     const isAdmin = (session as any)?.user?.role === 'ADMIN'
 
     // Get query parameters
@@ -111,8 +198,8 @@ export async function GET(request: NextRequest) {
     // Validate limit
     const validatedLimit = Math.min(Math.max(limit, 1), 50) // Between 1 and 50
 
-    // Generate mock leaderboard data
-    const leaderboard = generateMockLeaderboard(metric, validatedLimit)
+    // Generate real leaderboard data from database
+    const leaderboard = await generateRealLeaderboard(metric, validatedLimit, period, isAdmin, userId)
 
     // Add period-specific metadata
     const periodLabels = {
@@ -125,7 +212,7 @@ export async function GET(request: NextRequest) {
     const metricLabels = {
       tickets: 'Tickets Resolved',
       reports: 'Reports Submitted',
-      score: 'Average Score',
+      meetings: 'Meetings Attended',
       completion: 'Completion Rate (%)'
     }
 

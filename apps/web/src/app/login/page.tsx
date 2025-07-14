@@ -37,11 +37,15 @@ export default function LoginPage() {
     setIsLoading(true)
 
     try {
+      console.log('🔑 Attempting login for:', data.email)
       const result = await signIn('credentials', {
         email: data.email,
         password: data.password,
         redirect: false,
+        callbackUrl: '/dashboard',
       })
+
+      console.log('🔍 SignIn result:', result)
 
       if (result?.error) {
         toast({
@@ -50,16 +54,21 @@ export default function LoginPage() {
           variant: 'destructive',
         })
       } else {
-        // Get the session to check user role
-        const session = await getSession()
-        
         toast({
           title: 'Login Successful',
           description: 'Welcome back to DailySync!',
         })
 
-        // Redirect based on user role or to dashboard
+        // Force a small delay to ensure session is established
+        await new Promise(resolve => setTimeout(resolve, 100))
+
+        // Redirect to dashboard
         router.push('/dashboard')
+
+        // Force a page refresh to ensure session is loaded
+        setTimeout(() => {
+          window.location.href = '/dashboard'
+        }, 200)
       }
     } catch (error) {
       toast({
@@ -173,13 +182,13 @@ export default function LoginPage() {
               <div className="mt-4 space-y-2 text-sm text-muted-foreground">
                 <div className="p-3 bg-muted rounded-md">
                   <p className="font-medium">Admin Account:</p>
-                  <p>Email: admin@dailysync.com</p>
-                  <p>Password: admin123456</p>
+                  <p>Email: john.doe@dailysync.com</p>
+                  <p>Password: password123</p>
                 </div>
                 <div className="p-3 bg-muted rounded-md">
-                  <p className="font-medium">Support Agent:</p>
-                  <p>Email: john.doe@dailysync.com</p>
-                  <p>Password: agent123456</p>
+                  <p className="font-medium">User Account:</p>
+                  <p>Email: jane.smith@dailysync.com</p>
+                  <p>Password: password123</p>
                 </div>
               </div>
             </div>

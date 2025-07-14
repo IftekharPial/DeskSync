@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
+import { prisma } from '@dailysync/database'
 
 // Add CORS headers
 const corsHeaders = {
@@ -30,80 +31,158 @@ export async function GET(request: NextRequest) {
     // Get query parameters
     const { searchParams } = new URL(request.url)
     const days = parseInt(searchParams.get('days') || '30')
+    const userId = (session.user as any).id
 
-    // Generate mock meeting reports summary data
-    const mockSummary = {
-      totalMeetings: Math.floor(Math.random() * 50) + 20, // 20-70 meetings
-      averageDuration: Math.floor(Math.random() * 60) + 30, // 30-90 minutes
-      successfulMeetings: Math.floor(Math.random() * 40) + 15, // 15-55 successful
-      cancelledMeetings: Math.floor(Math.random() * 10) + 2, // 2-12 cancelled
-      totalAttendees: Math.floor(Math.random() * 200) + 50, // 50-250 attendees
-      averageAttendeesPerMeeting: parseFloat((Math.random() * 5 + 3).toFixed(1)), // 3.0-8.0
-      successRate: 0, // Will be calculated later
+    // Calculate date range
+    const startDate = new Date()
+    startDate.setDate(startDate.getDate() - days)
+    const endDate = new Date()
+
+    // Build where clause based on user role
+    const whereClause = isAdmin ? {} : { userId }
+
+    // Get real meeting reports data from database
+    const [
+      totalMeetings,
+      meetingsInRange,
+      outcomeStats,
+      meetingDurations,
+      recentMeetings
+    ] = await Promise.all([
+      // Total meetings count
+      prisma.meetingReport.count({ where: whereClause }),
+
+      // Meetings in date range
+      prisma.meetingReport.findMany({
+        where: {
+          ...whereClause,
+          startTime: {
+            gte: startDate,
+            lte: endDate
+          }
+        },
+        select: {
+          id: true,
+          outcome: true,
+          attendees: true,
+          startTime: true,
+          endTime: true
+        }
+      }),
+
+      // Meeting outcome statistics
+      prisma.meetingReport.groupBy({
+        by: ['outcome'],
+        where: {
+          ...whereClause,
+          startTime: {
+            gte: startDate,
+            lte: endDate
+          }
+        },
+        _count: {
+          outcome: true
+        }
+      }),
+
+      // Meeting durations for average calculation
+      prisma.meetingReport.findMany({
+        where: {
+          ...whereClause,
+          startTime: {
+            gte: startDate,
+            lte: endDate
+          },
+          endTime: {
+            not: null
+          }
+        },
+        select: {
+          startTime: true,
+          endTime: true
+        }
+      }),
+
+      // Recent meetings
+      prisma.meetingReport.findMany({
+        where: {
+          ...whereClause,
+          startTime: {
+            gte: startDate,
+            lte: endDate
+          }
+        },
+        select: {
+          id: true,
+          title: true,
+          startTime: true,
+          endTime: true,
+          outcome: true,
+          attendees: true,
+          notes: true
+        },
+        orderBy: {
+          startTime: 'desc'
+        },
+        take: 10
+      })
+    ])
+
+    // Calculate statistics from real data
+    const outcomeStatsMap = outcomeStats.reduce((acc, stat) => {
+      acc[stat.outcome] = stat._count.outcome
+      return acc
+    }, {} as Record<string, number>)
+
+    // Calculate total attendees
+    const totalAttendees = meetingsInRange.reduce((sum, meeting) => {
+      return sum + (meeting.attendees?.length || 0)
+    }, 0)
+
+    // Calculate average duration
+    const totalDurationMinutes = meetingDurations.reduce((sum, meeting) => {
+      if (meeting.endTime && meeting.startTime) {
+        const duration = meeting.endTime.getTime() - meeting.startTime.getTime()
+        return sum + (duration / (1000 * 60)) // Convert to minutes
+      }
+      return sum
+    }, 0)
+
+    const averageDuration = meetingDurations.length > 0
+      ? Math.round(totalDurationMinutes / meetingDurations.length)
+      : 0
+
+    const averageAttendeesPerMeeting = meetingsInRange.length > 0
+      ? parseFloat((totalAttendees / meetingsInRange.length).toFixed(1))
+      : 0
+
+    // Calculate success rate
+    const successfulCount = outcomeStatsMap['SUCCESSFUL'] || 0
+    const successRate = meetingsInRange.length > 0
+      ? Math.round((successfulCount / meetingsInRange.length) * 100)
+      : 0
+
+    // Build response data
+    const summary = {
+      totalMeetings: meetingsInRange.length,
+      averageDuration,
+      successfulMeetings: successfulCount,
+      cancelledMeetings: outcomeStatsMap['CANCELLED'] || 0,
+      totalAttendees,
+      averageAttendeesPerMeeting,
+      successRate,
       period: {
         days,
-        startDate: new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-        endDate: new Date().toISOString().split('T')[0]
+        startDate: startDate.toISOString().split('T')[0],
+        endDate: endDate.toISOString().split('T')[0]
       },
-      outcomes: {
-        successful: Math.floor(Math.random() * 40) + 15, // 15-55
-        postponed: Math.floor(Math.random() * 8) + 2, // 2-10
-        cancelled: Math.floor(Math.random() * 5) + 1, // 1-6
-        noShow: Math.floor(Math.random() * 3) + 1 // 1-4
-      },
-      trends: {
-        meetings: Math.floor(Math.random() * 10) - 5, // -5 to +5
-        duration: Math.floor(Math.random() * 20) - 10, // -10 to +10 minutes
-        successRate: Math.floor(Math.random() * 10) - 5, // -5 to +5%
-        attendees: Math.floor(Math.random() * 20) - 10 // -10 to +10
-      },
-      dailyBreakdown: Array.from({ length: Math.min(days, 30) }, (_, i) => {
-        const date = new Date(Date.now() - i * 24 * 60 * 60 * 1000)
-        const meetingsCount = Math.floor(Math.random() * 5) + 1 // 1-5 meetings per day
-        return {
-          date: date.toISOString().split('T')[0],
-          meetings: meetingsCount,
-          averageDuration: Math.floor(Math.random() * 60) + 30, // 30-90 minutes
-          successful: Math.floor(meetingsCount * 0.8), // 80% success rate
-          cancelled: Math.floor(meetingsCount * 0.1), // 10% cancelled
-          postponed: Math.floor(meetingsCount * 0.1), // 10% postponed
-          totalAttendees: meetingsCount * (Math.floor(Math.random() * 5) + 3), // 3-8 per meeting
-          successRate: Math.floor(Math.random() * 20) + 75 // 75-95%
-        }
-      }).reverse() // Most recent first
-    }
-
-    // Calculate derived metrics
-    const totalScheduled = mockSummary.totalMeetings
-    mockSummary.successfulMeetings = Math.min(mockSummary.successfulMeetings, totalScheduled)
-    mockSummary.cancelledMeetings = Math.min(mockSummary.cancelledMeetings, totalScheduled - mockSummary.successfulMeetings)
-    
-    const successRate = totalScheduled > 0 ? Math.round((mockSummary.successfulMeetings / totalScheduled) * 100) : 0
-    
-    // Add success rate to summary
-    mockSummary.successRate = successRate
-
-    // Filter data based on user role
-    if (!isAdmin) {
-      // For non-admin users, show only their own data
-      mockSummary.totalMeetings = Math.floor(mockSummary.totalMeetings / 3) || 1 // Assume 3 team members
-      mockSummary.successfulMeetings = Math.floor(mockSummary.successfulMeetings / 3) || 1
-      mockSummary.cancelledMeetings = Math.floor(mockSummary.cancelledMeetings / 3) || 0
-      mockSummary.totalAttendees = Math.floor(mockSummary.totalAttendees / 3) || 1
-      
-      mockSummary.dailyBreakdown = mockSummary.dailyBreakdown.map(day => ({
-        ...day,
-        meetings: Math.floor(day.meetings / 3) || 1,
-        successful: Math.floor(day.successful / 3) || 1,
-        cancelled: Math.floor(day.cancelled / 3) || 0,
-        postponed: Math.floor(day.postponed / 3) || 0,
-        totalAttendees: Math.floor(day.totalAttendees / 3) || 1
-      }))
+      outcomeStats: outcomeStatsMap,
+      recentMeetings: recentMeetings.slice(0, 5)
     }
 
     return NextResponse.json({
       success: true,
-      data: mockSummary
+      data: summary
     }, { headers: corsHeaders })
 
   } catch (error) {

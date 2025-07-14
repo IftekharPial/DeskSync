@@ -28,6 +28,16 @@ import { redirect } from 'next/navigation'
 import { copyToClipboard } from '@/lib/utils'
 import Link from 'next/link'
 
+// Utility function to get the correct base URL for webhooks
+function getWebhookBaseUrl(): string {
+  if (typeof window !== 'undefined') {
+    // Client-side: use current window location
+    return `${window.location.protocol}//${window.location.host}`
+  }
+  // Server-side fallback (shouldn't be used for webhook URLs)
+  return process.env.NEXTAUTH_URL || 'http://localhost:3000'
+}
+
 export default function WebhookDetailPage() {
   const { data: session } = useSession()
   const { toast } = useToast()
@@ -109,7 +119,8 @@ export default function WebhookDetailPage() {
 
   const copyWebhookUrl = async () => {
     if (webhook?.url) {
-      const fullUrl = `http://localhost:3001${webhook.url}`
+      const baseUrl = getWebhookBaseUrl()
+      const fullUrl = `${baseUrl}${webhook.url}`
       await copyToClipboard(fullUrl)
       toast({
         title: 'Copied',
@@ -269,7 +280,7 @@ export default function WebhookDetailPage() {
           <CardContent className="space-y-4">
             <div className="flex items-center space-x-2">
               <Input
-                value={`http://localhost:3001${webhook.url}`}
+                value={`${getWebhookBaseUrl()}${webhook.url}`}
                 readOnly
                 className="font-mono text-sm"
               />

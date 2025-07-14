@@ -15,36 +15,43 @@ import {
 interface DailyReportStatsProps {
   stats: {
     totalReports: number
+    reportsInRange: number
     averageTicketsResolved: number
     averageChatsHandled: number
     averageGithubIssues: number
     averageEmailsProcessed: number
     averageCallsAttended: number
+    totalTickets: number
+    totalChats: number
+    totalGithubIssues: number
+    totalEmails: number
+    totalCalls: number
     period: {
       days: number
       startDate: string
       endDate: string
     }
     trends?: {
-      ticketsResolved: string
-      chatsHandled: string
-      githubIssues: string
-      emailsProcessed: string
-      callsAttended: string
+      reports: number
+      tickets: number
+      chats: number
+      githubIssues: number
+      emails: number
+      calls: number
     }
-    chartData?: any[]
+    dailyBreakdown?: any[]
   }
 }
 
 export function DailyReportStats({ stats }: DailyReportStatsProps) {
-  // Transform API response to component format
+  // Use real data from API response
   const transformedStats = {
     totals: {
-      tickets: Math.round((stats?.averageTicketsResolved || 0) * (stats?.period?.days || 30)),
-      chats: Math.round((stats?.averageChatsHandled || 0) * (stats?.period?.days || 30)),
-      githubIssues: Math.round((stats?.averageGithubIssues || 0) * (stats?.period?.days || 30)),
-      emails: Math.round((stats?.averageEmailsProcessed || 0) * (stats?.period?.days || 30)),
-      calls: Math.round((stats?.averageCallsAttended || 0) * (stats?.period?.days || 30))
+      tickets: stats?.totalTickets || 0,
+      chats: stats?.totalChats || 0,
+      githubIssues: stats?.totalGithubIssues || 0,
+      emails: stats?.totalEmails || 0,
+      calls: stats?.totalCalls || 0
     },
     averages: {
       tickets: stats?.averageTicketsResolved || 0,
@@ -53,9 +60,11 @@ export function DailyReportStats({ stats }: DailyReportStatsProps) {
       emails: stats?.averageEmailsProcessed || 0,
       calls: stats?.averageCallsAttended || 0
     },
-    reportCount: stats?.totalReports || 0,
-    currentStreak: 7, // Default streak
-    period: stats?.period || { days: 30, startDate: '', endDate: '' }
+    reportCount: stats?.reportsInRange || 0,
+    totalReports: stats?.totalReports || 0,
+    currentStreak: Math.min(stats?.reportsInRange || 0, 30), // Calculate streak based on reports in range
+    period: stats?.period || { days: 30, startDate: '', endDate: '' },
+    trends: stats?.trends || {}
   }
 
   return (
@@ -67,7 +76,7 @@ export function DailyReportStats({ stats }: DailyReportStatsProps) {
           value={transformedStats.reportCount}
           description={`Last ${transformedStats.period?.days || 30} days`}
           icon={FileText}
-          trend={transformedStats.reportCount > 20 ? 15 : transformedStats.reportCount > 10 ? 5 : -2}
+          trend={transformedStats.trends.reports || 0}
         />
         <StatsCard
           title="Current Streak"
@@ -81,14 +90,14 @@ export function DailyReportStats({ stats }: DailyReportStatsProps) {
           value={transformedStats.totals.tickets}
           description="Tickets resolved"
           icon={CheckCircle}
-          trend={12}
+          trend={transformedStats.trends.tickets || 0}
         />
         <StatsCard
           title="Avg Daily Tickets"
           value={transformedStats.averages.tickets.toFixed(1)}
           description="Average per day"
           icon={TrendingUp}
-          trend={transformedStats.averages.tickets > 5 ? 8 : transformedStats.averages.tickets > 3 ? 3 : -1}
+          trend={transformedStats.trends.tickets || 0}
         />
       </div>
 

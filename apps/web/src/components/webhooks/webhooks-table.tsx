@@ -6,6 +6,7 @@ import { webhooksApi } from '@/lib/api'
 import { Button } from '@/components/ui/button'
 import { LoadingSpinner } from '@/components/ui/loading-spinner'
 import { useToast } from '@/components/ui/use-toast'
+import { EmptyWebhooks } from '@/components/ui/empty-state'
 import { formatDateTime, getStatusColor, copyToClipboard } from '@/lib/utils'
 import {
   Edit,
@@ -145,15 +146,7 @@ export function WebhooksTable({ onEdit }: WebhooksTableProps) {
   const pagination = data?.pagination
 
   if (webhooks.length === 0) {
-    return (
-      <div className="text-center py-8">
-        <Webhook className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-        <h3 className="text-lg font-medium mb-2">No webhooks found</h3>
-        <p className="text-muted-foreground">
-          Create your first webhook to start receiving HTTP requests
-        </p>
-      </div>
-    )
+    return <EmptyWebhooks />
   }
 
   return (
@@ -223,7 +216,7 @@ export function WebhooksTable({ onEdit }: WebhooksTableProps) {
                 <td className="py-3 px-4">
                   <div className="flex items-center space-x-1">
                     <span className="text-sm font-medium">
-                      {webhook.outgoingEndpoints?.length || 0}
+                      {webhook._count?.outgoingEndpoints || 0}
                     </span>
                     <span className="text-xs text-muted-foreground">endpoints</span>
                   </div>

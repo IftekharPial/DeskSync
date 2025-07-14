@@ -1,19 +1,24 @@
 'use client'
 
 import { useSession } from 'next-auth/react'
-import { useQuery } from 'react-query'
-import { analyticsApi } from '@/lib/api'
+import { useOptimizedDashboard } from '@/hooks/use-dashboard-data'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { LoadingSpinner } from '@/components/ui/loading-spinner'
 import { StatsCard } from '@/components/dashboard/stats-card'
 import { RecentActivity } from '@/components/dashboard/recent-activity'
 import { PerformanceChart } from '@/components/dashboard/performance-chart'
-import { 
-  FileText, 
-  MessageSquare, 
-  BarChart3, 
-  Users, 
-  TrendingUp, 
+import { EmptyDashboard } from '@/components/ui/empty-state'
+import { WelcomeBanner } from '@/components/onboarding/welcome-banner'
+import { OnboardingWizard } from '@/components/onboarding/onboarding-wizard'
+import { QuickStartGuide } from '@/components/onboarding/quick-start-guide'
+import { useOnboardingChecks, useOnboarding } from '@/hooks/use-onboarding'
+import { CacheDebug } from '@/components/debug/cache-debug'
+import {
+  FileText,
+  MessageSquare,
+  BarChart3,
+  Users,
+  TrendingUp,
   Clock,
   CheckCircle,
   AlertCircle
@@ -23,14 +28,11 @@ export default function DashboardPage() {
   const { data: session } = useSession()
   const isAdmin = (session as any)?.user?.role === 'ADMIN'
 
-  const { data: dashboardData, isLoading, error } = useQuery(
-    'dashboard',
-    analyticsApi.getDashboard,
-    {
-      select: (response) => response.data.data,
-      refetchInterval: 5 * 60 * 1000, // Refetch every 5 minutes
-    }
-  )
+  // Onboarding hooks
+  const onboardingChecks = useOnboardingChecks()
+  const { actions: onboardingActions } = useOnboarding()
+
+  const { data: dashboardData, isLoading, error } = useOptimizedDashboard()
 
   if (isLoading) {
     return (
@@ -58,7 +60,106 @@ export default function DashboardPage() {
     )
   }
 
-  const { dailyReports, userStats, deliveryStats, recentActivity } = dashboardData || {}
+  const { dailyReports, meetingReports, userStats, deliveryStats, recentActivity } = dashboardData || {}
+
+  // Check if this is a completely empty system (no data at all)
+  const hasAnyData = (
+    (dailyReports?.reportCount || 0) > 0 ||
+    (meetingReports?.reportCount || 0) > 0 ||
+    (userStats?.dailyReportsThisMonth || 0) > 0 ||
+    (userStats?.meetingReportsThisMonth || 0) > 0 ||
+    (recentActivity && recentActivity.length > 0)
+  )
+
+  // Show empty dashboard state for completely new systems
+  if (!hasAnyData) {
+    return (
+      <div className="space-y-6">
+        {/* Welcome Section */}
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">
+            Welcome back, {session?.user?.name || 'User'}!
+          </h1>
+          <p className="text-muted-foreground">
+            {isAdmin
+              ? 'Overview of system performance and team metrics'
+              : 'Your personal performance and recent activity'
+            }
+          </p>
+        </div>
+
+        {/* Onboarding Components */}
+        {onboardingChecks.shouldShowWelcomeBanner && (
+          <WelcomeBanner
+            userRole={isAdmin ? 'ADMIN' : 'USER'}
+            userName={session?.user?.name}
+            onDismiss={onboardingActions.dismissWelcomeBanner}
+            onStartTour={onboardingActions.startOnboardingWizard}
+          />
+        )}
+
+        {onboardingChecks.shouldShowOnboardingWizard && (
+          <OnboardingWizard
+            userRole={isAdmin ? 'ADMIN' : 'USER'}
+            onComplete={onboardingActions.completeOnboardingWizard}
+            onSkip={onboardingActions.completeOnboardingWizard}
+          />
+        )}
+
+        {onboardingChecks.shouldShowQuickStart && (
+          <QuickStartGuide
+            userRole={isAdmin ? 'ADMIN' : 'USER'}
+          />
+        )}
+
+        {/* Empty State - only show if no onboarding is active */}
+        {!onboardingChecks.shouldShowWelcomeBanner &&
+         !onboardingChecks.shouldShowOnboardingWizard &&
+         !onboardingChecks.shouldShowQuickStart && (
+          <EmptyDashboard isAdmin={isAdmin} />
+        )}
+
+        {/* Quick Actions for Empty State */}
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          <Card className="p-6">
+            <div className="flex items-center space-x-3">
+              <FileText className="h-8 w-8 text-primary" />
+              <div>
+                <h3 className="font-medium">Daily Reports</h3>
+                <p className="text-sm text-muted-foreground">
+                  Track your daily activities and performance
+                </p>
+              </div>
+            </div>
+          </Card>
+          <Card className="p-6">
+            <div className="flex items-center space-x-3">
+              <MessageSquare className="h-8 w-8 text-primary" />
+              <div>
+                <h3 className="font-medium">Meeting Reports</h3>
+                <p className="text-sm text-muted-foreground">
+                  Log meeting outcomes and action items
+                </p>
+              </div>
+            </div>
+          </Card>
+          {isAdmin && (
+            <Card className="p-6">
+              <div className="flex items-center space-x-3">
+                <Users className="h-8 w-8 text-primary" />
+                <div>
+                  <h3 className="font-medium">Team Management</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Manage users and view team analytics
+                  </p>
+                </div>
+              </div>
+            </Card>
+          )}
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-6">
@@ -66,7 +167,7 @@ export default function DashboardPage() {
       <div>
         <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
         <p className="text-muted-foreground">
-          {isAdmin 
+          {isAdmin
             ? 'Overview of system performance and team metrics'
             : 'Your personal performance and recent activity'
           }
@@ -83,60 +184,60 @@ export default function DashboardPage() {
               value={dailyReports?.reportCount || 0}
               description="Daily reports submitted"
               icon={FileText}
-              trend={12}
+              trend={dailyReports?.reportsTrend || 0}
             />
             <StatsCard
-              title="Active Users"
-              value={Array.isArray(dashboardData?.userPerformance) ? dashboardData.userPerformance.length : 0}
-              description="Team members reporting"
+              title="Recent Reports"
+              value={dailyReports?.reportsInRange || 0}
+              description="Reports this week"
               icon={Users}
-              trend={5}
+              trend={dailyReports?.reportsTrend || 0}
             />
             <StatsCard
-              title="Webhook Success"
-              value={`${deliveryStats?.successRate || 0}%`}
-              description="Delivery success rate"
+              title="Total Tickets"
+              value={dailyReports?.totalTickets || 0}
+              description="Tickets resolved this week"
               icon={CheckCircle}
-              trend={deliveryStats?.successRate > 95 ? 2 : -1}
+              trend={dailyReports?.ticketsTrend || 0}
             />
             <StatsCard
-              title="Avg Response Time"
-              value={`${Math.round(deliveryStats?.averageResponseTime || 0)}ms`}
-              description="Webhook response time"
+              title="Total Meetings"
+              value={meetingReports?.reportCount || 0}
+              description="Meetings this week"
               icon={Clock}
-              trend={-5}
+              trend={meetingReports?.meetingsTrend || 0}
             />
           </>
         ) : (
           // User stats
           <>
             <StatsCard
-              title="Reports This Month"
-              value={userStats?.dailyReports?.count || 0}
+              title="Reports This Week"
+              value={userStats?.dailyReportsThisMonth || 0}
               description="Daily reports submitted"
               icon={FileText}
-              trend={8}
+              trend={dailyReports?.reportsTrend || 0}
             />
             <StatsCard
               title="Tickets Resolved"
-              value={userStats?.dailyReports?.totals?.tickets || 0}
+              value={userStats?.totalTicketsResolved || 0}
               description="Total tickets handled"
               icon={CheckCircle}
-              trend={15}
+              trend={dailyReports?.ticketsTrend || 0}
             />
             <StatsCard
-              title="Meetings Attended"
-              value={userStats?.meetings?.count || 0}
-              description="Meetings this month"
+              title="Meetings This Week"
+              value={userStats?.meetingReportsThisMonth || 0}
+              description="Meetings attended"
               icon={MessageSquare}
-              trend={3}
+              trend={meetingReports?.meetingsTrend || 0}
             />
             <StatsCard
-              title="Avg Daily Tickets"
-              value={Math.round(userStats?.dailyReports?.averages?.tickets || 0)}
-              description="Average per day"
+              title="Chats Handled"
+              value={userStats?.totalChatsHandled || 0}
+              description="Total chats handled"
               icon={TrendingUp}
-              trend={userStats?.dailyReports?.averages?.tickets > 5 ? 10 : -2}
+              trend={dailyReports?.chatsTrend || 0}
             />
           </>
         )}
@@ -242,6 +343,11 @@ export default function DashboardPage() {
             </CardContent>
           </Card>
         </div>
+      )}
+
+      {/* Cache Debug Component (Development Only) */}
+      {process.env.NODE_ENV === 'development' && (
+        <CacheDebug compact className="mt-6" />
       )}
     </div>
   )

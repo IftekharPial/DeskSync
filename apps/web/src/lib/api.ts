@@ -41,17 +41,12 @@ const createApiClient = (): AxiosInstance => {
     },
   })
 
-  // Request interceptor to add auth token
+  // Request interceptor to ensure credentials are included
   client.interceptors.request.use(
     async (config) => {
-      const session = await getSession()
-      if (session?.user) {
-        // Assuming the session contains a token
-        const token = (session as any).token
-        if (token) {
-          config.headers.Authorization = `Bearer ${token}`
-        }
-      }
+      // NextAuth handles authentication via cookies automatically
+      // We just need to ensure credentials are included in requests
+      config.withCredentials = true
       return config
     },
     (error) => {

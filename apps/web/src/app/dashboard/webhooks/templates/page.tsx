@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from 'react-query'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -18,7 +18,7 @@ interface MessageTemplate {
   name: string
   template: string
   type: 'SLACK' | 'TEAMS' | 'API' | 'GOOGLE_SHEETS'
-  webhookType: 'GENERIC' | 'MEETING'
+  webhookType: 'GENERIC' | 'MEETING' | 'BOOKING'
   createdAt: string
 }
 
@@ -154,7 +154,8 @@ export default function MessageTemplatesPage() {
                       {template.type}
                     </Badge>
                     <Badge className={getWebhookTypeColor(template.webhookType)}>
-                      {template.webhookType === 'MEETING' ? '🤝 Meeting' : '📡 Generic'}
+                      {template.webhookType === 'MEETING' ? '🤝 Meeting' :
+                       template.webhookType === 'BOOKING' ? '📅 Booking' : '📡 Generic'}
                     </Badge>
                   </div>
                 </div>
@@ -216,11 +217,11 @@ export default function MessageTemplatesPage() {
   )
 }
 
-function TemplateForm({ 
-  template, 
-  onSubmit, 
-  isLoading 
-}: { 
+function TemplateForm({
+  template,
+  onSubmit,
+  isLoading
+}: {
   template?: MessageTemplate
   onSubmit: (data: Partial<MessageTemplate>) => void
   isLoading: boolean
@@ -229,8 +230,20 @@ function TemplateForm({
     name: template?.name || '',
     template: template?.template || '',
     type: template?.type || 'SLACK',
-    webhookType: template?.webhookType || 'GENERIC'
+    webhookType: template?.webhookType || 'BOOKING'
   })
+
+  // Update form data when template prop changes
+  useEffect(() => {
+    if (template) {
+      setFormData({
+        name: template.name || '',
+        template: template.template || '',
+        type: template.type || 'SLACK',
+        webhookType: template.webhookType || 'BOOKING'
+      })
+    }
+  }, [template])
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -275,6 +288,7 @@ function TemplateForm({
           <SelectContent>
             <SelectItem value="GENERIC">Generic Webhook</SelectItem>
             <SelectItem value="MEETING">Meeting Webhook</SelectItem>
+            <SelectItem value="BOOKING">Booking Webhook</SelectItem>
           </SelectContent>
         </Select>
       </div>
@@ -289,8 +303,16 @@ function TemplateForm({
           rows={6}
           required
         />
-        <div className="text-sm text-muted-foreground">
-          Use variables like <code>{`{{meetingTitle}}`}</code>, <code>{`{{clientName}}`}</code>, <code>{`{{startTimeFormatted}}`}</code>, <code>{`{{meetingId}}`}</code>
+        <div className="text-sm text-muted-foreground space-y-2">
+          <div>
+            <strong>Meeting variables:</strong> <code>{`{{title}}`}</code>, <code>{`{{meeting_id}}`}</code>, <code>{`{{start_time}}`}</code>, <code>{`{{end_time}}`}</code>, <code>{`{{participants}}`}</code>, <code>{`{{summary}}`}</code>
+          </div>
+          <div>
+            <strong>Booking variables:</strong> <code>{`{{first_name}}`}</code>, <code>{`{{last_name}}`}</code>, <code>{`{{email}}`}</code>, <code>{`{{message}}`}</code>, <code>{`{{online_platform_link}}`}</code>, <code>{`{{host_user_id}}`}</code>, <code>{`{{person_user_id}}`}</code>, <code>{`{{booking_id}}`}</code>, <code>{`{{booking_hash}}`}</code>
+          </div>
+          <div>
+            <strong>Functions:</strong> <code>{`{{date('iso')}}`}</code>, <code>{`{{uppercase(text)}}`}</code>, <code>{`{{lowercase(text)}}`}</code>
+          </div>
         </div>
       </div>
 

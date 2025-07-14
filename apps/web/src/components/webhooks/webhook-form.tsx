@@ -125,7 +125,12 @@ export function WebhookForm({ initialData, onSuccess, onCancel }: WebhookFormPro
 
   const copyWebhookUrl = async () => {
     if (initialData?.url) {
-      await copyToClipboard(initialData.url)
+      // Get the correct base URL for webhooks
+      const baseUrl = typeof window !== 'undefined'
+        ? `${window.location.protocol}//${window.location.host}`
+        : process.env.NEXTAUTH_URL || 'http://localhost:3000'
+      const fullUrl = `${baseUrl}${initialData.url}`
+      await copyToClipboard(fullUrl)
       toast({
         title: 'Copied',
         description: 'Webhook URL copied to clipboard',
@@ -145,7 +150,12 @@ export function WebhookForm({ initialData, onSuccess, onCancel }: WebhookFormPro
           </label>
           <div className="flex items-center space-x-2">
             <Input
-              value={initialData.url}
+              value={(() => {
+                const baseUrl = typeof window !== 'undefined'
+                  ? `${window.location.protocol}//${window.location.host}`
+                  : process.env.NEXTAUTH_URL || 'http://localhost:3000'
+                return `${baseUrl}${initialData.url}`
+              })()}
               readOnly
               className="font-mono text-sm"
             />

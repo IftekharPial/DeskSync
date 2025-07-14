@@ -161,9 +161,10 @@ export default function MeetingReportsPage() {
                 variant="outline"
                 className="w-full justify-start"
                 onClick={() => {
+                  // Create a blank meeting with current timestamp
                   const now = new Date()
                   const meeting = {
-                    title: 'Quick Meeting',
+                    title: '',
                     startTime: now.toISOString(),
                     outcome: 'PENDING',
                   }

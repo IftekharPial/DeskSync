@@ -3,11 +3,12 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@dailysync/database'
 
-// Add CORS headers
+// Add CORS and caching headers
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
   'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+  'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=600', // Cache for 5 minutes
 }
 
 export async function OPTIONS(request: NextRequest) {
@@ -40,6 +41,11 @@ export async function GET(request: NextRequest) {
     const startDate = new Date()
     startDate.setDate(startDate.getDate() - 7)
 
+    // Get previous period for trend calculations (7 days before the current period)
+    const previousEndDate = new Date(startDate)
+    const previousStartDate = new Date()
+    previousStartDate.setDate(previousStartDate.getDate() - 14)
+
     // Get real dashboard analytics from database
     const [
       totalDailyReports,
@@ -48,7 +54,9 @@ export async function GET(request: NextRequest) {
       recentMeetingReports,
       dailyReportsStats,
       meetingReportsStats,
-      timeSeries
+      timeSeries,
+      previousDailyReportsStats,
+      previousMeetingReportsStats
     ] = await Promise.all([
       // Total daily reports count
       prisma.dailyReport.count({ where: whereClause }),
@@ -162,13 +170,62 @@ export async function GET(request: NextRequest) {
         orderBy: {
           date: 'asc'
         }
+      }),
+
+      // Previous period daily reports stats for trend calculation
+      prisma.dailyReport.aggregate({
+        where: {
+          ...whereClause,
+          date: {
+            gte: previousStartDate,
+            lt: startDate
+          }
+        },
+        _sum: {
+          ticketsResolved: true,
+          chatsHandled: true,
+          githubIssues: true,
+          emailsProcessed: true,
+          callsAttended: true
+        },
+        _count: {
+          id: true
+        }
+      }),
+
+      // Previous period meeting reports stats for trend calculation
+      prisma.meetingReport.groupBy({
+        by: ['outcome'],
+        where: {
+          ...(isAdmin ? {} : { userId }),
+          createdAt: {
+            gte: previousStartDate,
+            lt: startDate
+          }
+        },
+        _count: {
+          outcome: true
+        }
       })
     ])
+
+    // Calculate trends by comparing current period with previous period
+    const calculateTrend = (current: number, previous: number): number => {
+      if (previous === 0) return current > 0 ? 100 : 0
+      return Math.round(((current - previous) / previous) * 100)
+    }
+
+    const currentTickets = dailyReportsStats._sum.ticketsResolved || 0
+    const previousTickets = previousDailyReportsStats._sum.ticketsResolved || 0
+    const currentReports = recentDailyReports.length
+    const previousReports = previousDailyReportsStats._count.id || 0
+    const currentMeetings = recentMeetingReports.length
+    const previousMeetings = previousMeetingReportsStats.reduce((sum, stat) => sum + stat._count.outcome, 0)
 
     const dashboardData = {
       dailyReports: {
         reportCount: totalDailyReports,
-        totalTickets: dailyReportsStats._sum.ticketsResolved || 0,
+        totalTickets: currentTickets,
         totalChats: dailyReportsStats._sum.chatsHandled || 0,
         totalEmails: dailyReportsStats._sum.emailsProcessed || 0,
         totalCalls: dailyReportsStats._sum.callsAttended || 0,
@@ -177,14 +234,20 @@ export async function GET(request: NextRequest) {
         averageChats: Math.round((dailyReportsStats._avg.chatsHandled || 0) * 100) / 100,
         averageEmails: Math.round((dailyReportsStats._avg.emailsProcessed || 0) * 100) / 100,
         averageCalls: Math.round((dailyReportsStats._avg.callsAttended || 0) * 100) / 100,
-        averageGithubIssues: Math.round((dailyReportsStats._avg.githubIssues || 0) * 100) / 100
+        averageGithubIssues: Math.round((dailyReportsStats._avg.githubIssues || 0) * 100) / 100,
+        // Trend calculations
+        reportsTrend: calculateTrend(currentReports, previousReports),
+        ticketsTrend: calculateTrend(currentTickets, previousTickets),
+        chatsTrend: calculateTrend(dailyReportsStats._sum.chatsHandled || 0, previousDailyReportsStats._sum.chatsHandled || 0),
+        emailsTrend: calculateTrend(dailyReportsStats._sum.emailsProcessed || 0, previousDailyReportsStats._sum.emailsProcessed || 0)
       },
       meetingReports: {
         reportCount: totalMeetingReports,
         outcomeStats: meetingReportsStats.reduce((acc, stat) => {
           acc[stat.outcome] = stat._count.outcome
           return acc
-        }, {} as Record<string, number>)
+        }, {} as Record<string, number>),
+        meetingsTrend: calculateTrend(currentMeetings, previousMeetings)
       },
       timeSeries: timeSeries.map(report => ({
         date: report.date.toISOString().split('T')[0],

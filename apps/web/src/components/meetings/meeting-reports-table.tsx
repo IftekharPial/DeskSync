@@ -6,12 +6,13 @@ import { meetingReportsApi } from '@/lib/api'
 import { Button } from '@/components/ui/button'
 import { LoadingSpinner } from '@/components/ui/loading-spinner'
 import { useToast } from '@/hooks/use-toast'
+import { EmptyMeetings } from '@/components/ui/empty-state'
 import { formatDateTime, formatDuration, getStatusColor } from '@/lib/utils'
-import { 
-  Edit, 
-  Trash2, 
-  ChevronLeft, 
-  ChevronRight, 
+import {
+  Edit,
+  Trash2,
+  ChevronLeft,
+  ChevronRight,
   MoreHorizontal,
   Calendar,
   Users,
@@ -92,15 +93,7 @@ export function MeetingReportsTable({ onEdit }: MeetingReportsTableProps) {
   const pagination = data?.pagination
 
   if (meetings.length === 0) {
-    return (
-      <div className="text-center py-8">
-        <Calendar className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-        <h3 className="text-lg font-medium mb-2">No meeting reports found</h3>
-        <p className="text-muted-foreground">
-          Start creating meeting reports to track your meetings and outcomes
-        </p>
-      </div>
-    )
+    return <EmptyMeetings />
   }
 
   return (

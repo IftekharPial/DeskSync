@@ -17,15 +17,8 @@ interface HealthChartProps {
 }
 
 export function HealthChart({ data }: HealthChartProps) {
-  // Mock time series data for health metrics
-  const healthData = [
-    { time: '00:00', successRate: 98.5, responseTime: 450, deliveries: 120 },
-    { time: '04:00', successRate: 99.1, responseTime: 420, deliveries: 95 },
-    { time: '08:00', successRate: 97.8, responseTime: 580, deliveries: 180 },
-    { time: '12:00', successRate: 98.9, responseTime: 390, deliveries: 220 },
-    { time: '16:00', successRate: 99.3, responseTime: 410, deliveries: 195 },
-    { time: '20:00', successRate: 98.7, responseTime: 470, deliveries: 165 },
-  ]
+  // Use real data from props or show empty state
+  const healthData = data?.timeSeries || []
 
   if (!healthData || healthData.length === 0) {
     return (

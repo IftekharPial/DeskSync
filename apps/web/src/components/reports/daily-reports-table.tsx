@@ -6,12 +6,13 @@ import { dailyReportsApi } from '@/lib/api'
 import { Button } from '@/components/ui/button'
 import { LoadingSpinner } from '@/components/ui/loading-spinner'
 import { useToast } from '@/components/ui/use-toast'
+import { EmptyReports } from '@/components/ui/empty-state'
 import { formatDate, cn } from '@/lib/utils'
-import { 
-  Edit, 
-  Trash2, 
-  ChevronLeft, 
-  ChevronRight, 
+import {
+  Edit,
+  Trash2,
+  ChevronLeft,
+  ChevronRight,
   ExternalLink,
   Calendar,
   MoreHorizontal
@@ -87,15 +88,7 @@ export function DailyReportsTable() {
   const pagination = data?.data?.pagination
 
   if (!Array.isArray(reports) || reports.length === 0) {
-    return (
-      <div className="text-center py-8">
-        <Calendar className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-        <h3 className="text-lg font-medium mb-2">No reports found</h3>
-        <p className="text-muted-foreground">
-          Start creating daily reports to track your progress
-        </p>
-      </div>
-    )
+    return <EmptyReports />
   }
 
   return (

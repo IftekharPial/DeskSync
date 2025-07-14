@@ -19,16 +19,19 @@ export function WebhookStats() {
     () => analyticsApi.getWebhookAnalytics(),
     {
       select: (response) => {
-        // Ensure we always return a valid structure
+        // Extract the actual data from the API response
         if (!response?.data?.data) {
-          return { webhooks: [], systemStats: {} }
+          return {
+            totalWebhooks: 0,
+            activeWebhooks: 0,
+            successRate: 0,
+            totalDeliveries: 0,
+            averageResponseTime: 0,
+            webhookStats: []
+          }
         }
 
-        const data = response.data.data
-        return {
-          webhooks: Array.isArray(data.webhooks) ? data.webhooks : [],
-          systemStats: data.systemStats || {}
-        }
+        return response.data.data
       },
       refetchInterval: 30000, // Refresh every 30 seconds
     }
@@ -44,38 +47,42 @@ export function WebhookStats() {
     )
   }
 
-  const systemStats = analyticsData?.systemStats || {}
-  const webhookCount = analyticsData?.webhooks?.length || 0
+  // Use the correct property names from the API response
+  const totalWebhooks = analyticsData?.totalWebhooks || 0
+  const activeWebhooks = analyticsData?.activeWebhooks || 0
+  const successRate = analyticsData?.successRate || 0
+  const totalDeliveries = analyticsData?.totalDeliveries || 0
+  const averageResponseTime = analyticsData?.averageResponseTime || 0
 
   return (
     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
       <StatsCard
         title="Active Webhooks"
-        value={webhookCount}
-        description="Total configured webhooks"
+        value={activeWebhooks}
+        description={`${totalWebhooks} total configured`}
         icon={Webhook}
-        trend={webhookCount > 0 ? 5 : 0}
+        trend={activeWebhooks > 0 ? 5 : 0}
       />
       <StatsCard
         title="Success Rate"
-        value={`${systemStats.successRate || 0}%`}
+        value={`${successRate}%`}
         description="Delivery success rate"
         icon={CheckCircle}
-        trend={systemStats.successRate > 95 ? 8 : systemStats.successRate > 90 ? 3 : -2}
+        trend={successRate > 95 ? 8 : successRate > 90 ? 3 : -2}
       />
       <StatsCard
         title="Total Deliveries"
-        value={systemStats.totalDeliveries || 0}
-        description="Last 24 hours"
+        value={totalDeliveries}
+        description="All time deliveries"
         icon={Activity}
-        trend={15}
+        trend={totalDeliveries > 0 ? 15 : 0}
       />
       <StatsCard
         title="Avg Response Time"
-        value={`${Math.round(systemStats.averageResponseTime || 0)}ms`}
+        value={`${Math.round(averageResponseTime)}ms`}
         description="Average delivery time"
         icon={Clock}
-        trend={systemStats.averageResponseTime < 1000 ? 5 : systemStats.averageResponseTime < 2000 ? 0 : -3}
+        trend={averageResponseTime < 1000 ? 5 : averageResponseTime < 2000 ? 0 : -3}
       />
     </div>
   )

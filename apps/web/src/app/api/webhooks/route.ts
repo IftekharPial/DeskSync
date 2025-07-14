@@ -49,7 +49,7 @@ function transformWebhookForAPI(webhook: any) {
       name: webhook.creator.name,
       email: webhook.creator.email,
     } : null,
-    _count: webhook._count || { payloadLogs: 0 },
+    _count: webhook._count || { payloadLogs: 0, outgoingEndpoints: 0 },
   }
 }
 
@@ -109,6 +109,7 @@ export async function GET(request: NextRequest) {
           _count: {
             select: {
               payloadLogs: true,
+              outgoingEndpoints: true,
             },
           },
         },
